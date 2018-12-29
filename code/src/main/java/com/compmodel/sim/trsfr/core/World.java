@@ -5,14 +5,22 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.DoubleSummaryStatistics;
+import java.util.IntSummaryStatistics;
+import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 import javax.imageio.ImageIO;
 
@@ -176,13 +184,13 @@ public class World implements Serializable{
 	public static final int RESEED_PCT = 10;  // Percent of atoms to be replaced in reseed
 	public static final int MASS_RATIO = 4;   //Determines how we adjust atom and transformer positions after interaction	
 	public static final int MASS_RATIO_LINKED = 4;  // Determines positions adjustment when trsf is in the chain	
-	public static final int TEMPERATURE = 10; // determines probability of random move
+	public static final int TEMPERATURE = 80; // determines probability of random move
 	public static final int IDLE_WAIT = 5;	  // seeds transformer can wait without making any actions before it starts to move randomly 
 	private static final int MAX_FILES_CNT = 3000;
-	private static final int  SAVE_SHOT_PERIOD = 500;
-	private static final int  SAVE_SNAPSHOT_PERIOD = 10; // one snapshot per 100 shots
+	private static final int SAVE_SHOT_PERIOD = 500;
+	private static final int SAVE_SNAPSHOT_PERIOD = 10; // one snapshot per XX shots
 	private static final boolean SHOW_ATOMS = true; 
-	private static final String FILE_DIR = "d:\\sergey\\javaproj\\trsfr\\shots\\shots02\\"; //"c:\\Users\\Aii3x\\sergey\\shots\\shots06\\";
+	private static final String FILE_DIR = "C:\\Users\\Aii3x\\sergey\\shots\\shots04\\"; //"c:\\Users\\Aii3x\\sergey\\shots\\shots06\\";
 	private static final long RANDOM_SEED = 3432716543l;
 	private static Random rand = new Random(RANDOM_SEED);
 	
@@ -260,14 +268,150 @@ public class World implements Serializable{
 				saveShotForTransformers();
 				if(fileCntTransformers % saveSnapShotPeriod == 0) {
 					saveWorldSnapshot();
+					saveAnalytics();
+					//printTrsfSpaceNames();
 				}
 			}
-			if(fileCntTransformers >= maxFilesCnt) {  
+			if(fileCntTransformers >= maxFilesCnt) { 
 				log.info("===== run finished =====");
 				return;
 			}
 		}
 	}
+
+	private void saveAnalytics() {
+		List<Chain> chains = extractChains(3);	// minimum 3 links in a chain
+		String fileName = fileDir+"world_analytics_"+String.format("%05d",fileCntTransformers)+".txt";
+		String line1 = buildWorldParamsTitle()+ "\n";
+		IntSummaryStatistics stats = chains.stream().mapToInt(Chain::getLength).summaryStatistics();
+		String line2 = "chains:"+stats.getCount()+", avgLength:"+String.format("%04.1f",stats.getAverage())
+			+", maxLength:"+String.format("%3d",stats.getMax())+"\n";
+	    FileWriter fw=null;
+	    try {
+	        fw = new FileWriter(fileName,false);
+	        BufferedWriter bw=new BufferedWriter(fw);
+	        PrintWriter out = new PrintWriter(bw);
+	        out.write(line1);
+	        out.write(line2);
+	        chains.stream().forEach(chain -> out.write(chain.getSummary()+"\n"));
+	        out.close();
+	    } catch (IOException e) {
+	        // TODO Auto-generated catch block
+	        e.printStackTrace();
+	    }	
+        log.info(" === Saved analytics {}",fileName);
+	}
+
+	private List<Chain> extractChains(int minLength) {
+		ArrayList<Chain> chains = new ArrayList<Chain>();
+		ArrayList<Transformer> tmpArr = (ArrayList<Transformer>) transformers.clone();
+		// Extract non-circular first
+		while(true) {
+			/* Searh end of the chain and then remove it from tmpArr.
+			   until only standalone transformers remain */
+			Chain chain = null;
+			int i = 0;
+			for(Transformer trsf: tmpArr) {
+				//log.info("=== i:{}",++i);
+				if(trsf.getBonds().size() == 1) {
+					chain = buildChainFromTheEnd(trsf);
+					if(chain.size() >= minLength) {
+						chains.add(chain);
+					}
+					break;
+				}
+			}
+			if(chain != null) {
+				tmpArr.removeAll(chain.getLinks());
+			}else {
+				//log.info("=== no more chains");
+				break;
+			}
+			//log.info("=== tmpArr.size();:{}",tmpArr.size());
+		}
+		// Now get circular
+		while(true) {
+			Chain chain = null;
+			int i = 0;
+			for(Transformer trsf: tmpArr) {
+				//log.info("=== i:{}",++i);
+				if(trsf.getBonds().size() == 2) {
+					chain = buildChainFromTheEnd(trsf);
+					if(chain.size() >= minLength) {
+						chains.add(chain);
+					}
+					break;
+				}
+			}
+			if(chain != null) {
+				tmpArr.removeAll(chain.getLinks());
+			}else {
+				//log.info("=== no more chains");
+				break;
+			}
+			//log.info("=== tmpArr.size();:{}",tmpArr.size());
+		}
+		//log.info("=== done");
+		return chains.stream().sorted(Comparator.comparing(Chain::size).reversed()).collect(Collectors.toList());
+	}
+
+	private Chain buildChainFromTheEnd(Transformer trsf) {
+		Chain chain = new Chain();
+		chain.setCircular(false);
+		double strength = trsf.getBonds().get(0).getStrength(seedCnt);
+		long age = seedCnt - trsf.getBonds().get(0).getCreatedSeedCnt();
+		chain.addLink(trsf, strength, age);
+		Transformer prevTrsf = trsf;
+		Transformer curTrsf = trsf.getBonds().get(0).getTransformer();
+		/*log.info("===== building chain for {}",trsf);
+		for(Bond bond: trsf.getBonds()) {
+			Transformer t1 = bond.getTransformer();
+			log.info("======= t1: {}",t1);
+			for(Bond bond2: t1.getBonds()) {
+				Transformer t2 = bond2.getTransformer();
+				log.info("========= t2: {}",t2);	
+				for(Bond bond3: t2.getBonds()) {
+					Transformer t3 = bond3.getTransformer();
+					log.info("=========== t3: {}",t3);	
+				}
+			}
+		}*/
+		int i = 0;
+		while(true) {
+			//log.info("===== i:"+(++i)+", trsf:"+trsf+", curTrsf:"+curTrsf+"("+curTrsf.getBonds().size()+"), prevTrsf:"+prevTrsf+"("+prevTrsf.getBonds().size()+")" );
+			if(curTrsf == trsf) {
+				// circular chain
+				chain.setCircular(true);
+				//log.info("===== circular chain");
+				break;
+			}
+			if(curTrsf.getBonds().size() == 1) {
+				//log.info("===== end of chain");
+				// end of chain, setting strength and age same as for the last link
+				strength = chain.getStrengths().get(chain.size() - 1);
+				age = chain.getAges().get(chain.size() - 1);
+				chain.addLink(curTrsf, strength, age);
+				break;
+			}
+			// Add next link
+			for(Bond bond : curTrsf.getBonds()) {
+				if(bond.getTransformer() == prevTrsf) {
+					// skip bond back to prev link
+					//log.info("===== skip backward bond");
+					continue;
+				}
+				//log.info("===== adding next link with curTrsf:"+curTrsf+" and switching to next:"+bond.getTransformer());
+				strength = bond.getStrength(seedCnt);
+				age = seedCnt - bond.getCreatedSeedCnt();
+				chain.addLink(curTrsf, strength, age);
+				prevTrsf = curTrsf;
+				curTrsf = bond.getTransformer();
+				break;
+			}
+		}
+		return chain;
+	}
+	
 
 	/**
 	 * Serialize current instance of the world.
@@ -478,20 +622,21 @@ public class World implements Serializable{
 			return true;
 		}
 		// Get the number of neighbors that will be removed if trsf moves to new location
-		ArrayList<Transformer> newNeighb = getTransformersWithin(coord, 1);	
-		newNeighb.remove(trsf);
-		int neighborsToRemoveCnt = 0;
-		for(Bond bond:trsf.getBonds()){
-			if(Coordinates.calcDistance(bond.getTransformer().getCoords(), coord) > maxNeighborDistance) {
-				neighborsToRemoveCnt++;
-			}
-		}
+		int preservedNeighbCnt = trsf.getBonds().size();
 		if(withPull) {
 			// When we want to pull the whole chain, 
 			// After relocation trsf will keep the existing neighbor
-			neighborsToRemoveCnt = 0;
+			preservedNeighbCnt = 1;
+		}else {
+			for(Bond bond:trsf.getBonds()){
+				if(Coordinates.calcDistance(bond.getTransformer().getCoords(), coord) > maxNeighborDistance) {
+					preservedNeighbCnt--;
+				}
+			}
 		}
 		// Get the number of neighbors that will be added if trsf moves to new location
+		ArrayList<Transformer> newNeighb = getTransformersWithin(coord, 1);	
+		newNeighb.remove(trsf);
 		int newNeigbCont = 0;
 		for(Transformer tmpTrsf: newNeighb) {
 			if(tmpTrsf.getBonds().size() >= maxNeighborNumber
@@ -508,7 +653,7 @@ public class World implements Serializable{
 				newNeigbCont++;
 			}
 		}
-		if(newNeigbCont - neighborsToRemoveCnt > maxNeighborNumber ) {
+		if(newNeigbCont + preservedNeighbCnt > maxNeighborNumber ) {
 			return true;	// after removing current neighbors and adding new ones, we exceed maxNeighborNumber
 		}
 		return false;
@@ -592,16 +737,7 @@ public class World implements Serializable{
 	        ig2.fillRect(0, 0, width, height);
 	        Font font = new Font("TimesRoman", Font.PLAIN, 14);
 	        ig2.setFont(font);
-	        String message = "Transformers, T:"+temperature+
-	        		", eScale:"+energyScale+
-	        		", idleWait:"+idleWait+
-	        		", massR:"+massRatio+
-	        		", massRlnkd:"+massRatioLinked+
-	        		", searchDst:" + searchDistance +
-	        		", distPnlty:"+actionDistancePenalty +
-	        		//", neibDst:" + maxNeighborDistance +
-	        		//", neibNum:"+maxNeighborNumber +
-	        		", atoms:"+ atomsNumber+", trsfrs:"+trsfrNumber+", seedCnt:"+seedCnt;
+	        String message = buildWorldParamsTitle();
 	        FontMetrics fontMetrics = ig2.getFontMetrics();
 	        int stringWidth = fontMetrics.stringWidth(message);
 	        int stringHeight = fontMetrics.getAscent();
@@ -677,6 +813,20 @@ public class World implements Serializable{
     		log.info(" === Saving transformes shot, seedCnt:{}, fileCntTransformers:{}", seedCnt, fileCntTransformers);
 	    }
 
+	private String buildWorldParamsTitle() {
+		String message = "Transformers, T:"+temperature+
+				", eScale:"+energyScale+
+				", idleWait:"+idleWait+
+				", massR:"+massRatio+
+				", massRlnkd:"+massRatioLinked+
+				", searchDst:" + searchDistance +
+				", distPnlty:"+actionDistancePenalty +
+				//", neibDst:" + maxNeighborDistance +
+				//", neibNum:"+maxNeighborNumber +
+				", atoms:"+ atomsNumber+", trsfrs:"+trsfrNumber+", seedCnt:"+seedCnt;
+		return message;
+	}
+
 	/**
 	 * Imitates random motion of a transformer
 	 *  Gather the immediate vicinity, i.e. distance = 1
@@ -714,8 +864,7 @@ public class World implements Serializable{
 		ArrayList<Coordinates> vicinity = Coordinates.getVicinity(trsf.getCoords(), 1);
 		Collections.shuffle(vicinity);
 		for(Coordinates tmpCoord : vicinity) {
-			if(getTransformerAt(tmpCoord) == null
-				&& !isCoordForbidden(trsf, tmpCoord,pullWholeChain)){
+			if(!isCoordForbidden(trsf, tmpCoord,pullWholeChain)){
 				// Compare energy levels
 				double tmpLevel = getEnergyLevel(trsf,tmpCoord,pullWholeChain);
 				if(enoughEnergyForMove(tmpLevel - curLevel)) {
@@ -820,16 +969,16 @@ public class World implements Serializable{
 			StringBuilder sb = new StringBuilder(String.format("%3d",j));
 			for(int i=0;i<SPACE_SIZE;i++) {
 				if (trsfSpace[i][j] != null) {
-					String name = trsfSpace[i][j].getName();
-					sb.append(name.substring(name.length()-4)).append(".");
+					String name =  trsfSpace[i][j].toString(); // trsfSpace[i][j].getName();
+					sb.append(name.substring(name.length()-9)).append(".");
 				}else {
-					sb.append(".....");
+					sb.append("..........");
 				}
 			}
 			sbTotal.append(sb).append("\n");
 		}
 		sbTotal.append("   .........1.........2.........3.........4.........5.........6.........7.........8.........9.........0");
-		log.debug(sbTotal.toString());
+		log.info(sbTotal.toString());
 	}
 
 	private void printAtomSpace() {
@@ -890,7 +1039,7 @@ public class World implements Serializable{
 				&& pNeighbor.getBonds().size() < maxNeighborNumber
 				&& Coordinates.calcDistance(pNeighbor.getCoords(), newCoord) <= maxNeighborDistance) {
 				pNeighbor.addNeighbor(trsf, seedCnt);
-				trsf.addNeighbor(pNeighbor, seedCnt);
+				//trsf.addNeighbor(pNeighbor, seedCnt);
 			}
 		}	
 		int[] coords = trsf.getCoords().getCoords();
@@ -944,7 +1093,7 @@ public class World implements Serializable{
 				&& trsf.getBonds().size() < maxNeighborNumber
 				&& pNeighbor.getBonds().size() < maxNeighborNumber) {
 				pNeighbor.addNeighbor(trsf, seedCnt);
-				trsf.addNeighbor(pNeighbor, seedCnt);
+				//trsf.addNeighbor(pNeighbor, seedCnt);
 			}
 		}	
 		

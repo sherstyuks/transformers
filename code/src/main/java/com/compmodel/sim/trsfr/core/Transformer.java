@@ -101,6 +101,25 @@ public class Transformer implements Serializable {
 		return linkedCount;	
 	}
 
+	public ArrayList<Transformer> getLinked(ArrayList<Transformer> curLevelChain) {
+		if(bonds.size() == 0) {
+			return curLevelChain;	// Standalone transformer
+		}
+		if(curLevelChain == null) {
+			// Call from the top level
+			curLevelChain = new ArrayList<Transformer>();
+			curLevelChain.add(this);	// to detect circular chain or link back to self
+		}
+		for(Bond curBond : bonds) {
+			if(curLevelChain.contains(curBond.getTransformer())) {
+				continue;
+			}
+			curLevelChain.add(curBond.getTransformer()); 
+			curLevelChain = curBond.getTransformer().getLinked(curLevelChain);
+		}
+		return curLevelChain;	
+	}
+
 	/**
 	 * Try to find an atom within INIT_SEARCH_DISTANCE
 	 * to transform it.
@@ -211,10 +230,12 @@ public class Transformer implements Serializable {
 
 	/**
 	 * Create new bond with initial strength 1
+	 * Bond is created bi-directionally
 	 * @param trsf
 	 */
 	public void addNeighbor(Transformer trsf, long createdSeedCnt) {
 		bonds.add(new Bond(trsf, 1l, createdSeedCnt));
+		trsf.getBonds().add(new Bond(this, 1l, createdSeedCnt));
 	}
 	
 	public Coordinates getCoords() {

@@ -28,7 +28,7 @@ public class Bond implements Serializable{
 		if (diff <= 0) {
 			diff =1;
 		}
-		return (double)actionCnt/diff;
+		return 0.5*(double)actionCnt/diff;
 	}
 	
 	public Transformer getTransformer() {
