@@ -16,7 +16,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.DoubleSummaryStatistics;
 import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.Random;
@@ -184,13 +183,13 @@ public class World implements Serializable{
 	public static final int RESEED_PCT = 10;  // Percent of atoms to be replaced in reseed
 	public static final int MASS_RATIO = 4;   //Determines how we adjust atom and transformer positions after interaction	
 	public static final int MASS_RATIO_LINKED = 4;  // Determines positions adjustment when trsf is in the chain	
-	public static final int TEMPERATURE = 80; // determines probability of random move
+	public static final int TEMPERATURE = 10; // determines probability of random move
 	public static final int IDLE_WAIT = 5;	  // seeds transformer can wait without making any actions before it starts to move randomly 
-	private static final int MAX_FILES_CNT = 3000;
+	private static final int MAX_FILES_CNT = 4000;
 	private static final int SAVE_SHOT_PERIOD = 500;
 	private static final int SAVE_SNAPSHOT_PERIOD = 10; // one snapshot per XX shots
 	private static final boolean SHOW_ATOMS = true; 
-	private static final String FILE_DIR = "C:\\Users\\Aii3x\\sergey\\shots\\shots04\\"; //"c:\\Users\\Aii3x\\sergey\\shots\\shots06\\";
+	private static final String FILE_DIR = "C:\\Users\\Aii3x\\sergey\\shots\\shots05\\"; //"c:\\Users\\Aii3x\\sergey\\shots\\shots06\\";
 	private static final long RANDOM_SEED = 3432716543l;
 	private static Random rand = new Random(RANDOM_SEED);
 	
@@ -266,10 +265,10 @@ public class World implements Serializable{
 			updateIdleTransformers();
 			if(seedCnt % saveShotPeriod == 0) {
 				saveShotForTransformers();
+				printTrsfSpaceNames();
 				if(fileCntTransformers % saveSnapShotPeriod == 0) {
 					saveWorldSnapshot();
 					saveAnalytics();
-					//printTrsfSpaceNames();
 				}
 			}
 			if(fileCntTransformers >= maxFilesCnt) { 
@@ -296,7 +295,6 @@ public class World implements Serializable{
 	        chains.stream().forEach(chain -> out.write(chain.getSummary()+"\n"));
 	        out.close();
 	    } catch (IOException e) {
-	        // TODO Auto-generated catch block
 	        e.printStackTrace();
 	    }	
         log.info(" === Saved analytics {}",fileName);
@@ -324,17 +322,17 @@ public class World implements Serializable{
 			if(chain != null) {
 				tmpArr.removeAll(chain.getLinks());
 			}else {
-				//log.info("=== no more chains");
+				//log.debug("=== no more chains");
 				break;
 			}
-			//log.info("=== tmpArr.size();:{}",tmpArr.size());
+			//log.debug("=== tmpArr.size();:{}",tmpArr.size());
 		}
 		// Now get circular
 		while(true) {
 			Chain chain = null;
 			int i = 0;
 			for(Transformer trsf: tmpArr) {
-				//log.info("=== i:{}",++i);
+				//log.debug("=== i:{}",++i);
 				if(trsf.getBonds().size() == 2) {
 					chain = buildChainFromTheEnd(trsf);
 					if(chain.size() >= minLength) {
@@ -346,12 +344,12 @@ public class World implements Serializable{
 			if(chain != null) {
 				tmpArr.removeAll(chain.getLinks());
 			}else {
-				//log.info("=== no more chains");
+				//log.debug("=== no more chains");
 				break;
 			}
-			//log.info("=== tmpArr.size();:{}",tmpArr.size());
+			//log.debug("=== tmpArr.size();:{}",tmpArr.size());
 		}
-		//log.info("=== done");
+		//log.debug("=== done");
 		return chains.stream().sorted(Comparator.comparing(Chain::size).reversed()).collect(Collectors.toList());
 	}
 
@@ -363,30 +361,17 @@ public class World implements Serializable{
 		chain.addLink(trsf, strength, age);
 		Transformer prevTrsf = trsf;
 		Transformer curTrsf = trsf.getBonds().get(0).getTransformer();
-		/*log.info("===== building chain for {}",trsf);
-		for(Bond bond: trsf.getBonds()) {
-			Transformer t1 = bond.getTransformer();
-			log.info("======= t1: {}",t1);
-			for(Bond bond2: t1.getBonds()) {
-				Transformer t2 = bond2.getTransformer();
-				log.info("========= t2: {}",t2);	
-				for(Bond bond3: t2.getBonds()) {
-					Transformer t3 = bond3.getTransformer();
-					log.info("=========== t3: {}",t3);	
-				}
-			}
-		}*/
 		int i = 0;
 		while(true) {
-			//log.info("===== i:"+(++i)+", trsf:"+trsf+", curTrsf:"+curTrsf+"("+curTrsf.getBonds().size()+"), prevTrsf:"+prevTrsf+"("+prevTrsf.getBonds().size()+")" );
+			//log.debug("===== i:"+(++i)+", trsf:"+trsf+", curTrsf:"+curTrsf+"("+curTrsf.getBonds().size()+"), prevTrsf:"+prevTrsf+"("+prevTrsf.getBonds().size()+")" );
 			if(curTrsf == trsf) {
 				// circular chain
 				chain.setCircular(true);
-				//log.info("===== circular chain");
+				//log.debug("===== circular chain");
 				break;
 			}
 			if(curTrsf.getBonds().size() == 1) {
-				//log.info("===== end of chain");
+				//log.debug("===== end of chain");
 				// end of chain, setting strength and age same as for the last link
 				strength = chain.getStrengths().get(chain.size() - 1);
 				age = chain.getAges().get(chain.size() - 1);
@@ -397,10 +382,10 @@ public class World implements Serializable{
 			for(Bond bond : curTrsf.getBonds()) {
 				if(bond.getTransformer() == prevTrsf) {
 					// skip bond back to prev link
-					//log.info("===== skip backward bond");
+					//log.debug("===== skip backward bond");
 					continue;
 				}
-				//log.info("===== adding next link with curTrsf:"+curTrsf+" and switching to next:"+bond.getTransformer());
+				//log.debug("===== adding next link with curTrsf:"+curTrsf+" and switching to next:"+bond.getTransformer());
 				strength = bond.getStrength(seedCnt);
 				age = seedCnt - bond.getCreatedSeedCnt();
 				chain.addLink(curTrsf, strength, age);
@@ -412,7 +397,6 @@ public class World implements Serializable{
 		return chain;
 	}
 	
-
 	/**
 	 * Serialize current instance of the world.
 	 */
@@ -431,7 +415,6 @@ public class World implements Serializable{
 		
 	}
 	
-
 	/**
 	 * After all turns finished check all transformers,
 	 * if there were actions during the seed.
@@ -536,53 +519,237 @@ public class World implements Serializable{
 	 * @return
 	 */
 	private boolean tryMoveTransformerTowardsTo(Transformer trsf, Coordinates newCoord) {
-		double trsfrMoveChance = 0.;
-		boolean pullWholeChain = false;
-		int neighbCnt = trsf.getBonds().size();
-		switch(neighbCnt ) {
-		case 0:
-			trsfrMoveChance =  1.0/massRatio;	// Move standalone trsf
-			break;
-		case 1:
-			int linkedCnt = trsf.getLinkedCount(null);
-			trsfrMoveChance = 1.0/(massRatioLinked * (linkedCnt +1));	// Pull the whole chain by the ending trsf
-			pullWholeChain = true;
-			break;
-		default:
-			trsfrMoveChance = 1.0/massRatio;	// Tear off trsf out of chain
-		}
-		if(rand.nextDouble() > trsfrMoveChance) {
-			//log.info("=== after action, bad luck with trsfrMoveChance:{}",trsfrMoveChance );
-			return false;
-		}
+		double trsfrMoveThr = 1.0 - 1.0/massRatio;	// threshold to move or tear off single transformer
+		double chainMoveThr = 1.0 - 1.0/(massRatioLinked * (trsf.getLinkedCount(null) +1));	// threshold to move the whole chain
+		double rnd = rand.nextDouble();
 		Coordinates curCoord = trsf.getCoords();
-		double curLevel = getEnergyLevel(trsf, curCoord, pullWholeChain);
+		double curLevel = getEnergyLevel(trsf, curCoord);
 		ArrayList<Coordinates> vicinity = Coordinates.getVicinity(curCoord, 1);
 		Collections.shuffle(vicinity);
 		int origDistance = Coordinates.calcDistance(curCoord, newCoord);
-		for(Coordinates tmpCoord : vicinity) {
-			//Transformer var = getTransformerAt(tmpCoord);
-			//int tmpDistance = Coordinates.calcDistance(tmpCoord, newCoord);
-			if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
-				&& !isCoordForbidden(trsf, tmpCoord, pullWholeChain)){
-				// Compare energy levels
-				double tmpLevel = getEnergyLevel(trsf,tmpCoord, pullWholeChain);
-				if(enoughEnergyForMove(tmpLevel - curLevel)) {
-					if(pullWholeChain) {
-						relocateTransformerWithNeigborsTo(trsf, tmpCoord);
-						//log.info("=== after action. whole chain, trsfrMoveChance:{}",trsfrMoveChance );
-					}else {
+		int neighbCnt = trsf.getBonds().size();
+		if(neighbCnt == 0) {
+			// === standalone transformer
+			if(rnd > trsfrMoveThr) {
+				for(Coordinates tmpCoord : vicinity) {
+					if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
+						&& !isCoordForbidden(trsf, tmpCoord, false)){
 						relocateTransformerTo(trsf, tmpCoord);
-						//log.info("=== after action, trsf, neighbCnt:"+neighbCnt+", curLevel:"+curLevel+", tmpLevel:"+tmpLevel);
+						log.debug("=== tryMoveTransformerTowardsTo, standalone move allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
+						verifyTrsfPositions();
+						return true;
 					}
-					return true;
 				}
+				log.debug("=== tryMoveTransformerTowardsTo, standalone move failed, no place for "+trsf.getShortInfo());
+			}else {
+				log.debug("=== tryMoveTransformerTowardsTo, standalone move failed, no luck for "+trsf.getShortInfo());
+			}
+			return false;
+		}else if(neighbCnt == 1) {
+			// === end of the chain
+			if(rnd > chainMoveThr) {
+				// first, try to pull the chain
+				for(Coordinates tmpCoord : vicinity) {
+					if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
+						&& !isCoordForbidden(trsf, tmpCoord, true)){
+						/* No need to compare energy levels, because with simplified energy
+						 * we do not consider possible attraction at tmpCoord from new neighbor
+						 */
+						log.debug("=== tryMoveTransformerTowardsTo, endOfChain whole chain pull allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
+						tearOffOrPullTransformer(trsf, tmpCoord);
+						verifyTrsfPositions();
+						return true;
+					}
+				}
+				log.debug("=== tryMoveTransformerTowardsTo, endOfChain move failed, no place for "+trsf.getShortInfo());
+			}else if(rnd > trsfrMoveThr) {
+				// next try to tear off the single trsf
+				for(Coordinates tmpCoord : vicinity) {
+					if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
+						&& !isCoordForbidden(trsf, tmpCoord, false)){
+						// Compare energy levels
+						double tmpLevel = getEnergyLevel(trsf,tmpCoord);
+						if(enoughEnergyForMove(tmpLevel - curLevel)) {
+							log.debug("=== tryMoveTransformerTowardsTo, endOfChain tear off allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
+							relocateTransformerTo(trsf, tmpCoord);
+							verifyTrsfPositions();
+							return true;
+						}
+					}
+				}
+				log.debug("=== tryMoveTransformerTowardsTo, endOfChain tear off failed, no place for "+trsf.getShortInfo());
+			}else {
+				log.debug("=== tryMoveTransformerTowardsTo, endOfChain move failed, no luck for "+trsf.getShortInfo());
+			}
+			return false;
+		}else {
+			// === inside the chain
+			chainMoveThr = 0.;
+			if(rnd > chainMoveThr) {
+				// first, try to move the chain
+				ArrayList<Transformer> links = trsf.getLinked(null);
+				log.debug("=== tryMoveTransformerTowardsTo, inside chain:"+links);
+				for(Coordinates tmpCoord : vicinity) {
+					//log.debug("=== tryMoveTransformerTowardsTo, inside chain vicinity, tmpCoord:"+tmpCoord
+					//		+", newCoord:"+newCoord+". dist:"+Coordinates.calcDistance(tmpCoord, newCoord)
+					//		+", origDist:"+origDistance);
+					if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
+						&& !isMoveForbiddenForLinks(trsf, tmpCoord, links)){
+						/* No need to compare energy levels, because with simplified energy
+						 * we do not consider possible attraction at tmpCoord from new neighbors
+						 */
+						log.debug("=== tryMoveTransformerTowardsTo, inside chain whole chain move allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
+						moveTransformerWithLinks(trsf, tmpCoord, links);
+						verifyTrsfPositions();
+						return true;
+					}
+				}
+				log.debug("=== tryMoveTransformerTowardsTo, inside chain whole chain move failed, no place for "+trsf.getShortInfo());
+			}else if(rnd > trsfrMoveThr) {
+				// next try to tear off the single trsf
+				for(Coordinates tmpCoord : vicinity) {
+					if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
+						&& !isCoordForbidden(trsf, tmpCoord, false)){
+						// Compare energy levels
+						double tmpLevel = getEnergyLevel(trsf,tmpCoord);
+						if(enoughEnergyForMove(tmpLevel - curLevel)) {
+							log.debug("=== tryMoveTransformerTowardsTo, inside chain tear off allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
+							relocateTransformerTo(trsf, tmpCoord);
+							verifyTrsfPositions();
+							return true;
+						}
+					}
+				}
+				log.debug("=== tryMoveTransformerTowardsTo, inside chain failed, no place for "+trsf.getShortInfo());
+			}else {
+				log.debug("=== tryMoveTransformerTowardsTo, insideChain move failed, no luck for "+trsf.getShortInfo());
 			}
 		}
 		return false;
 		//log.debug("moved {} delta: {}",trsf.getName(),Coordinates.deltaToString(trsf.getCoords(), newCoord));
 	}
 	
+	private void moveTransformerWithLinks(Transformer trsf, Coordinates newCoord, ArrayList<Transformer> links) {
+		Coordinates delta = Coordinates.subtract(newCoord, trsf.getCoords());
+		log.debug("=== moveTransformerWithLinks starts, trsf:"+trsf.getShortInfo()+", links.size:"+links.size()+", delta: "+delta);
+		log.debug("=== links before:"+buildLinksInfo(links));
+		int i =0;
+		for(Transformer linkTrsf : links) {
+			Coordinates tmpCoord = Coordinates.add(linkTrsf.getCoords(), delta);
+			log.debug("===== moveTransformerWithLinks, "+(++i)+":  moving linkTrsf:"+linkTrsf.getShortInfo()+" to "+tmpCoord);
+			changeCoordsForTransformer(linkTrsf, tmpCoord, "from moveTransformerWithLinks, "+i+":  moving linkTrsf:"+linkTrsf.getShortInfo());
+			// For ends only it is possible to add neighbors
+			if(linkTrsf.getBonds().size() == 1) {
+				log.debug("======= moveTransformerWithLinks, trsf:"+trsf.getShortInfo()+", end detected, check if we need to add neighbor at "+tmpCoord);
+				ArrayList<Transformer> newNeighb = getTransformersWithin(tmpCoord, 1);	
+				newNeighb.remove(linkTrsf);
+				for(Transformer neighbTrsf: newNeighb) {
+					if(!linkTrsf.hasNeighbor(neighbTrsf)
+						&& !links.contains(neighbTrsf)) { // do not add its own link
+						linkTrsf.addNeighbor(neighbTrsf, seedCnt);
+						log.debug("========= moveTransformerWithLinks, added neighbor "+neighbTrsf.getShortInfo()+" to "+linkTrsf.getShortInfo());
+						break;
+					}
+				}
+			}
+		}
+		// Have to restore links positions in space, because changeCoordsForTransformer could wipe out values for each other  
+		for(Transformer linkTrsf : links) {
+			trsfSpace[linkTrsf.getCoords().getCoords()[0]][linkTrsf.getCoords().getCoords()[1]] = linkTrsf;
+		}
+		log.debug("=== links after:"+buildLinksInfo(links));
+	}
+
+	private void changeCoordsForTransformer(Transformer trsf, Coordinates newCoord, String info) {
+		int[] coorArr = trsf.getCoords().getCoords();
+		trsfSpace[coorArr[0]][coorArr[1]] = null;
+		trsf.setCoords(newCoord);
+		int[] coorArrNew = newCoord.getCoords();
+		trsfSpace[coorArrNew[0]][coorArrNew[1]] = trsf;
+		String oldSpaceOccupant = trsfSpace[coorArr[0]][coorArr[1]]==null?"null":trsfSpace[coorArr[0]][coorArr[1]].getShortInfo();
+		String newSpaceOccupant = trsfSpace[coorArrNew[0]][coorArrNew[1]]==null?"null":trsfSpace[coorArrNew[0]][coorArrNew[1]].getShortInfo();
+		log.debug("=== changeCoordsForTransformer, "+", trsf:"+trsf.getShortInfo()
+			+", old space("+coorArr[0]+","+coorArr[1]+"):"+oldSpaceOccupant
+				+ ", new space("+coorArrNew[0]+","+coorArrNew[1]+"):"+newSpaceOccupant+", caller: "+info);
+		
+	}
+
+	private String buildLinksInfo(ArrayList<Transformer> links) {
+		StringBuilder sb = new StringBuilder();
+		for(Transformer trsf:links) {
+			sb.append("{").append(trsf.getShortInfoWithBonds()).append(")} ");
+		}
+		return sb.toString();
+	}
+
+	/**
+	 * Check if the whole links can be moved.
+	 * Move is defined by trsf to newCoord,
+	 * all transformers in links will be moved in parallel.
+	 * 
+	 * @param trsf
+	 * @param tmpCoord
+	 * @param links
+	 * @return
+	 */
+	private boolean isMoveForbiddenForLinks(Transformer trsf, Coordinates newCoord, ArrayList<Transformer> links) {
+		Coordinates delta = Coordinates.subtract(newCoord, trsf.getCoords());
+		log.debug("=== isMoveForbiddenForLinks starts, trsf:"+trsf.getShortInfo()+", links.size():"+links.size()+", delta: "+delta);
+		for(Transformer linkTrsf : links) {
+			log.debug("===== isMoveForbiddenForLinks testing linkTrsf:"+linkTrsf.getShortInfo());
+			Coordinates tmpCoord = Coordinates.add(linkTrsf.getCoords(), delta);
+			if(!isWithinSpace(tmpCoord)) {
+				log.debug("======= isMoveForbiddenForLinks, new location "+tmpCoord+" is outside of space ");
+				return true;
+			}
+			// Check tmpCoord is free
+			Transformer tmpTrsf = getTransformerAt(tmpCoord);
+			if(tmpTrsf != null 	&& !links.contains(tmpTrsf)) {
+				// new location is occupied already
+				log.debug("======= isMoveForbiddenForLinks, new location "+tmpCoord+" is occupied already for "+linkTrsf.getShortInfo());
+				return true;
+			}
+			// Check tmpCoord has no repulsive neighbors
+			ArrayList<Transformer> newNeighb = getTransformersWithin(tmpCoord, 1);	
+			newNeighb.remove(linkTrsf);
+			int newNeigbCont = linkTrsf.getBonds().size();
+			for(Transformer neighbTrsf: newNeighb) {
+				if(links.contains(neighbTrsf)) {
+					continue;	// if neighbTrsf is part of linke, it won't be at this place after the move, so ignore it
+				}
+				if(neighbTrsf.getBonds().size() >= maxNeighborNumber) {
+					// One of the transformer around the new location already has full list
+					// and won't accept a new neighbor, stop further check
+					log.debug("======= isMoveForbiddenForLinks, new location "+tmpCoord+" has "+neighbTrsf.getShortInfo()+" that won't accept a new neighbor");
+					return true;	
+				}
+				/* Not sure if it possible to have an existing neighbor to be preserved
+				   after the move to a new location, when MAX_NEIGHBOR_DISTANCE=1,
+				   but making check just in case
+				   */
+				if(!linkTrsf.hasNeighbor(neighbTrsf)) {
+					newNeigbCont++;
+				}
+			}
+			// check not too many neighbors in new location
+			if(newNeigbCont > maxNeighborNumber) {				
+				log.debug("======= isMoveForbiddenForLinks, new location "+tmpCoord+" has too many neighbors for "+linkTrsf.getShortInfo());
+				return true;
+			}
+		}
+		log.debug("=== isMoveForbiddenForLinks, move towards "+newCoord+" allowed for links with "+trsf.getShortInfo());
+		return false;
+	}
+
+	
+	private boolean isWithinSpace(Coordinates testCoord) {
+		for( int coord : testCoord.getCoords()) {
+			if(coord < 0 || coord >= SPACE_SIZE) {
+				return false;
+			}
+		}
+		return true;
+	}
 
 	/**
 	 * Simplified version of calculating energy level.
@@ -594,18 +761,10 @@ public class World implements Serializable{
 	 * @param newCoords
 	 * @return
 	 */
-	private double getEnergyLevel(Transformer trsf, Coordinates newCoord, boolean pullWholeChain) {
-		if(pullWholeChain) {
-			// When we calculate energy for a tentative location,
-			// and it will be a case with pulling the chain, the old neighbor stays,
-			// energy level remains zero
-			return 0;
-		}else {
+	private double getEnergyLevel(Transformer trsf, Coordinates newCoord) {
 			return trsf.getEnergyLevel(newCoord, seedCnt);
-		}
 	}
-		
-	
+			
 	/**
 	 * Check:
 	 * - new coord is already occupied with another trsf.
@@ -618,7 +777,9 @@ public class World implements Serializable{
 	 * @return
 	 */
 	private boolean isCoordForbidden(Transformer trsf, Coordinates coord, boolean withPull) {
+		log.debug("=== isCoordForbidden, trfs:"+trsf.getShortInfo()+", coord: "+coord+", getTransformerAt(coord):"+getTransformerAt(coord));
 		if(getTransformerAt(coord) != null) {
+			log.debug("=== isCoordForbidden, trfs:"+trsf.getShortInfo()+", to "+coord+", pull:"+withPull+ " occupied, blocked");
 			return true;
 		}
 		// Get the number of neighbors that will be removed if trsf moves to new location
@@ -643,6 +804,7 @@ public class World implements Serializable{
 				&& !tmpTrsf.hasNeighbor(trsf)) {
 				// One of the transformer around the new location already has full list
 				// and won't accept a new neighbor, stop further check
+				log.debug("=== isCoordForbidden, trfs:"+trsf.getShortInfo()+", to "+coord+", pull:"+withPull+ " repulsed blocked");
 				return true;	
 			}
 			/* Not sure if it possible to have an existing neighbor to be preserved
@@ -654,8 +816,10 @@ public class World implements Serializable{
 			}
 		}
 		if(newNeigbCont + preservedNeighbCnt > maxNeighborNumber ) {
+			log.debug("=== isCoordForbidden, trfs:"+trsf.getShortInfo()+", to "+coord+", pull:"+withPull+ " exceed maxNeighborNumber blocked");
 			return true;	// after removing current neighbors and adding new ones, we exceed maxNeighborNumber
 		}
+		log.debug("=== isCoordForbidden, trfs:"+trsf.getShortInfo()+", to "+coord+", pull:"+withPull+ " allowed");
 		return false;
 	}
 	
@@ -681,14 +845,13 @@ public class World implements Serializable{
 		double treshold = initPenalty + (delta/energyScale - temperature/MAX_TEMPERATURE);
 		double val = Math.abs(rand.nextGaussian());
 		if(val > treshold) {
-			//log.info("move allowed, delta:"+delta+", treshold:"+treshold+", val:"+val+", %:"+100.0*((float)++allowedMoveCnt/(float)++tryMoveCnt));
+			//log.debug("move allowed, delta:"+delta+", treshold:"+treshold+", val:"+val+", %:"+100.0*((float)++allowedMoveCnt/(float)++tryMoveCnt));
 			return true;
 		}
-		//log.info("move stopped, delta:"+delta+", treshold:"+treshold+", val:"+val+", %:"+100.0*((float)allowedMoveCnt/(float)++tryMoveCnt));
+		//log.debug("move stopped, delta:"+delta+", treshold:"+treshold+", val:"+val+", %:"+100.0*((float)allowedMoveCnt/(float)++tryMoveCnt));
 		return false;
 	}
 	
-
 	/**
 	 * Scan immediate vicinity of an atom,
 	 * if there is a free spot that is closer to the newCoord,
@@ -713,9 +876,7 @@ public class World implements Serializable{
 		return false;
 		//log.debug("moved {} delta: {}",trsf.getName(),Coordinates.deltaToString(trsf.getCoords(), newCoord));
 	}
-	
-
-	
+		
 	private void relocateAtomTo(Atom atom, Coordinates newCoord) {
 		int[] coordsArr = atom.getCoords().getCoords();
 		atomSpace[coordsArr[0]][coordsArr[1]] = null;
@@ -859,35 +1020,34 @@ public class World implements Serializable{
 		if(rand.nextDouble() > trsfrMoveChance) {
 			return false;
 		}
-		//log.info("=== move trsf randomly with moveChance:{}, pullWholeChain:{}",trsfrMoveChance,pullWholeChain);
-		double curLevel = getEnergyLevel(trsf, trsf.getCoords(),pullWholeChain);
+		//log.debug("=== move trsf randomly with moveChance:{}, pullWholeChain:{}",trsfrMoveChance,pullWholeChain);
+		double curLevel = getEnergyLevel(trsf, trsf.getCoords());
 		ArrayList<Coordinates> vicinity = Coordinates.getVicinity(trsf.getCoords(), 1);
 		Collections.shuffle(vicinity);
 		for(Coordinates tmpCoord : vicinity) {
 			if(!isCoordForbidden(trsf, tmpCoord,pullWholeChain)){
 				// Compare energy levels
-				double tmpLevel = getEnergyLevel(trsf,tmpCoord,pullWholeChain);
+				double tmpLevel = getEnergyLevel(trsf,tmpCoord);
 				if(enoughEnergyForMove(tmpLevel - curLevel)) {
 					if(pullWholeChain) {
-						relocateTransformerWithNeigborsTo(trsf, tmpCoord);
-						//log.info("=== random. whole chain, trsfrMoveChance:{}",trsfrMoveChance );
+						tearOffOrPullTransformer(trsf, tmpCoord);
+						//log.debug("=== random. whole chain, trsfrMoveChance:{}",trsfrMoveChance );
 					}else {
 						relocateTransformerTo(trsf, tmpCoord);
-						//log.info("=== random, trsf, neighbCnt:"+neighbCnt+", curLevel:"+curLevel+", tmpLevel:"+tmpLevel);
+						//log.debug("=== random, trsf, neighbCnt:"+neighbCnt+", curLevel:"+curLevel+", tmpLevel:"+tmpLevel);
 					}
 					return true;
 				}
 				/* Once free spot found, only one attempt is allowed, 
 				 * do not try others from vicinity
 				 */
-				//log.info("=== random no luck");
+				//log.debug("=== random no luck");
 				return false;
 			}	
 		}
 		return false;
 	}
 	
-
 	/**
 	 * Get list of atoms with coords not further than given 
 	 * distance from the given center.
@@ -903,14 +1063,13 @@ public class World implements Serializable{
 			Atom atom = getAtomAt(coord);
 			if(atom != null) {
 				if(distance == 0) {
-					log.info("found atom at zero distance from: "+ center);
+					log.debug("found atom at zero distance from: "+ center);
 				}
 				result.add(atom);
 			}
 		});
 		return result;
 	}		
-
 
 	/**
 	 * Get list of atoms with coords on the given 
@@ -978,7 +1137,7 @@ public class World implements Serializable{
 			sbTotal.append(sb).append("\n");
 		}
 		sbTotal.append("   .........1.........2.........3.........4.........5.........6.........7.........8.........9.........0");
-		log.info(sbTotal.toString());
+		log.debug(sbTotal.toString());
 	}
 
 	private void printAtomSpace() {
@@ -1041,13 +1200,14 @@ public class World implements Serializable{
 				pNeighbor.addNeighbor(trsf, seedCnt);
 				//trsf.addNeighbor(pNeighbor, seedCnt);
 			}
-		}	
-		int[] coords = trsf.getCoords().getCoords();
+		}
+		changeCoordsForTransformer(trsf,newCoord," from relocateTransformerTo, "+trsf.getShortInfo());
+		/*int[] coords = trsf.getCoords().getCoords();
 		trsfSpace[coords[0]][coords[1]] = null;
 		trsf.setCoords(newCoord);
 		coords = trsf.getCoords().getCoords();
 		trsfSpace[coords[0]][coords[1]] = trsf;
-		
+		*/
 	}
 			
 	/**
@@ -1057,31 +1217,35 @@ public class World implements Serializable{
 	 * @param trsf
 	 * @param newCoord
 	 */
-	private void relocateTransformerWithNeigborsTo(Transformer trsf, Coordinates newCoord) {
+	private void tearOffOrPullTransformer(Transformer trsf, Coordinates newCoord) {
 		boolean pullWholeChain = false;
+		log.debug("tearOffOrPullTransformer, trsf:"+trsf.getShortInfoWithBonds()+", newCoord:"+newCoord);
 		if(trsf.getBonds().size() == 1) {
 			pullWholeChain = true;
 		}
 		// Tear off neighbors
 		ArrayList<Bond> bondsToRemove = new ArrayList<Bond>();
 		for(Bond bond:trsf.getBonds()){
+			log.debug("tearOffOrPullTransformer, neighb:"+bond.getTransformer().getShortInfo()+", newDist:"+Coordinates.calcDistance(bond.getTransformer().getCoords(), newCoord));
 			if(Coordinates.calcDistance(bond.getTransformer().getCoords(), newCoord) > maxNeighborDistance) {
 				boolean removed = bond.getTransformer().removeNeighbor(trsf); 
 				bondsToRemove.add(bond);
 			}
 		}
 		trsf.getBonds().removeAll(bondsToRemove);
-		// Move trsf to new position, 
 		Coordinates origCoords = trsf.getCoords();
-		int[] spaceCoords = origCoords.getCoords();
+		changeCoordsForTransformer(trsf, newCoord, "from tearOffOrPullTransformer,"+trsf.getShortInfo());
+		// Move trsf to new position, 
+		/*int[] spaceCoords = origCoords.getCoords();
 		trsfSpace[spaceCoords[0]][spaceCoords[1]] = null;
 		trsf.setCoords(newCoord);
 		spaceCoords = trsf.getCoords().getCoords();
 		trsfSpace[spaceCoords[0]][spaceCoords[1]] = trsf;
+		*/
 		if(pullWholeChain) {
 			// at this moment neighborsToRemove.get(0) becomes an end of the chain,
 			// so repeat the pull recursively
-			relocateTransformerWithNeigborsTo(bondsToRemove.get(0).getTransformer(), origCoords);
+			tearOffOrPullTransformer(bondsToRemove.get(0).getTransformer(), origCoords);
 		}
 		// adding neighbors at new position
 		// old neighbor supposed to be restored during this step
@@ -1160,7 +1324,7 @@ public class World implements Serializable{
 			}
 		}
 		seedCnt++;
-		//log.info("seeding atoms done, seedCnt:{}",seedCnt);
+		//log.debug("seeding atoms done, seedCnt:{}",seedCnt);
 	}
 
 	public Atom createRandomAtom() {
@@ -1210,9 +1374,7 @@ public class World implements Serializable{
 					}
 				}
 				if(sameCoords) {
-					log.error("===== Same coords: "+transformers.get(j).getCoords().toString()
-							+", for: trsf["+i+"]: "+transformers.get(i).getName()
-							+", for: trsf["+j+"]: "+transformers.get(j).getName());
+					log.error("===== Same coords: "+transformers.get(i).getShortInfo()+", "+transformers.get(j).getShortInfo());
 				}
 			}
 		}
@@ -1266,7 +1428,7 @@ public class World implements Serializable{
 	      	} catch (IOException ie) {
 	      		ie.printStackTrace();
 	      	}	
-	    	log.info(" === Saving atoms shot, seedCnt:{}, fileCntAtom:{}", seedCnt, fileCntAtoms);
+	    	log.debug(" === Saving atoms shot, seedCnt:{}, fileCntAtom:{}", seedCnt, fileCntAtoms);
 	    }
 */
 	public int getSearchDistance() {

@@ -101,23 +101,22 @@ public class Transformer implements Serializable {
 		return linkedCount;	
 	}
 
-	public ArrayList<Transformer> getLinked(ArrayList<Transformer> curLevelChain) {
+	public ArrayList<Transformer> getLinked(ArrayList<Transformer> curLevelLinks) {
 		if(bonds.size() == 0) {
-			return curLevelChain;	// Standalone transformer
+			return curLevelLinks;	// Standalone transformer
 		}
-		if(curLevelChain == null) {
+		if(curLevelLinks == null) {
 			// Call from the top level
-			curLevelChain = new ArrayList<Transformer>();
-			curLevelChain.add(this);	// to detect circular chain or link back to self
+			curLevelLinks = new ArrayList<Transformer>();
 		}
+		curLevelLinks.add(this);	
 		for(Bond curBond : bonds) {
-			if(curLevelChain.contains(curBond.getTransformer())) {
-				continue;
+			Transformer curBondTrsf = curBond.getTransformer();
+			if(!curLevelLinks.contains(curBondTrsf)) { // to detect circular chain or link back to self
+				curLevelLinks = curBond.getTransformer().getLinked(curLevelLinks); 
 			}
-			curLevelChain.add(curBond.getTransformer()); 
-			curLevelChain = curBond.getTransformer().getLinked(curLevelChain);
 		}
-		return curLevelChain;	
+		return curLevelLinks;	
 	}
 
 	/**
@@ -234,10 +233,27 @@ public class Transformer implements Serializable {
 	 * @param trsf
 	 */
 	public void addNeighbor(Transformer trsf, long createdSeedCnt) {
-		bonds.add(new Bond(trsf, 1l, createdSeedCnt));
-		trsf.getBonds().add(new Bond(this, 1l, createdSeedCnt));
+		if(!hasNeighbor(trsf)) {
+			bonds.add(new Bond(trsf, 1l, createdSeedCnt));
+			trsf.getBonds().add(new Bond(this, 1l, createdSeedCnt));
+		}
 	}
-	
+
+	public String getShortInfo() {
+		String name =  this.toString(); 
+		return inputType.toString()+outputType.toString()+name.substring(name.length()-9)+ getCoords();
+	}
+
+	public String getShortInfoWithBonds() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(getShortInfo()).append("(");
+		for(Bond bond:getBonds()) {
+			sb.append(bond.getTransformer().getShortInfo()).append(":");
+		}
+		sb.append(")");
+		return sb.toString();
+	}
+
 	public Coordinates getCoords() {
 		return coords;
 	}
@@ -497,6 +513,7 @@ public class Transformer implements Serializable {
 	public void setBonds(ArrayList<Bond> bonds) {
 		this.bonds = bonds;
 	}
+
 
 
 }

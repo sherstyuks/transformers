@@ -32,11 +32,11 @@ public class Chain {
 		sb.append("Size:").append(String.format("%3d",links.size())).append(",")
 		.append(isCircular)
 		.append(", Strength:").append(String.format("%04.1f",statsS.getAverage())).append("(")
-			.append(String.format("%05.1f",statsS.getMax())).append(",")
+			.append(String.format("%04.1f",statsS.getMax())).append(",")
 			.append(String.format("%03.1f",statsS.getMin()))
-		.append("), Age:").append(String.format("%07.1f",statsA.getAverage())).append("(")
-			.append(String.format("%6d",statsA.getMax())).append(",")
-			.append(String.format("%6d",statsA.getMin())).append(")");
+		.append("), Age:").append(String.format("%8d",(long)statsA.getAverage())).append("(")
+			.append(String.format("%8d",statsA.getMax())).append(",")
+			.append(String.format("%8d",statsA.getMin())).append(")");
 		return sb.toString();
 	}
 	

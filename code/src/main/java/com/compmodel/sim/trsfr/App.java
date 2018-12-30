@@ -162,12 +162,13 @@ public class App
 	private static void changeSettings(World world2) {
 		//world.setActionDistancePenalty(0.3);
 		//world.setEnergyScale(0.5);
-		world.setFileDir("C:\\Users\\Aii3x\\sergey\\shots\\tmp2\\");
+		world.setFileDir("C:\\Users\\Aii3x\\sergey\\shots\\tmp\\");
 		//world.setIdleWait(3);
 		//world.setMassRatio(4);
 		//world.setMassRatioLinked(12);
-		world.setMaxFilesCnt(10000);
-		world.setSaveShotPeriod(1);
+		world.setFileCntTransformers(0);
+		world.setMaxFilesCnt(500);
+		world.setSaveShotPeriod(500);
 		//world.setSearchDistance(6);
 		//world.setShowAtoms(true);
 		//world.setTemperature(10);
