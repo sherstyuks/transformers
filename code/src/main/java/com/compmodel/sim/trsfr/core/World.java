@@ -16,6 +16,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.DoubleSummaryStatistics;
 import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.Random;
@@ -185,11 +186,13 @@ public class World implements Serializable{
 	public static final int MASS_RATIO_LINKED = 4;  // Determines positions adjustment when trsf is in the chain	
 	public static final int TEMPERATURE = 10; // determines probability of random move
 	public static final int IDLE_WAIT = 5;	  // seeds transformer can wait without making any actions before it starts to move randomly 
-	private static final int MAX_FILES_CNT = 4000;
-	private static final int SAVE_SHOT_PERIOD = 500;
-	private static final int SAVE_SNAPSHOT_PERIOD = 10; // one snapshot per XX shots
+	private static final int MAX_FILES_CNT = 3000;
+	private static final int SAVE_SHOT_PERIOD = 1; // save picture every XX seedCnt
+	private static final int SAVE_SNAPSHOT_PERIOD = 10; // save world snapshot every XX seedCnt
+	private static final int CHAIN_ANALYTICS_PERIOD = 5; // save  chain analytics every XX seedCnt
+	private static final int WORLD_ANALYTICS_PERIOD = 10; // build  WorldStatsSummary every XX seedCnt
 	private static final boolean SHOW_ATOMS = true; 
-	private static final String FILE_DIR = "C:\\Users\\Aii3x\\sergey\\shots\\shots05\\"; //"c:\\Users\\Aii3x\\sergey\\shots\\shots06\\";
+	private static final String FILE_DIR = "C:\\Users\\Aii3x\\sergey\\shots\\shots07\\"; //"c:\\Users\\Aii3x\\sergey\\shots\\shots06\\";
 	private static final long RANDOM_SEED = 3432716543l;
 	private static Random rand = new Random(RANDOM_SEED);
 	
@@ -214,10 +217,14 @@ public class World implements Serializable{
 	private int maxFilesCnt;
 	private int saveShotPeriod;
 	private int saveSnapShotPeriod;
+	private int chainAnaliticsPeriod;
+	private int worldAnaliticsPeriod;
 	private boolean showAtoms;
 	private String fileDir;
 	public ArrayList<Atom> atoms;
 	public ArrayList<Transformer> transformers;
+	private ArrayList<WorldStatsSummary> worldStats;
+	private transient WorldStatsSummary curStatsWorld;
 			
 	private transient int  turnCnt = 0;
 	private long  totalTurns = 0;
@@ -247,10 +254,14 @@ public class World implements Serializable{
 		maxFilesCnt = MAX_FILES_CNT;
 		saveShotPeriod =  SAVE_SHOT_PERIOD;
 		saveSnapShotPeriod =  SAVE_SNAPSHOT_PERIOD;
+		chainAnaliticsPeriod = CHAIN_ANALYTICS_PERIOD;
+		worldAnaliticsPeriod = WORLD_ANALYTICS_PERIOD;
 		showAtoms = SHOW_ATOMS;
 		fileDir = FILE_DIR;
 		atoms = new ArrayList<Atom>();
 		transformers = new ArrayList<Transformer>();
+		worldStats = new ArrayList<WorldStatsSummary>();
+		curStatsWorld = null;
 	}
 
 	public void run() {
@@ -258,6 +269,7 @@ public class World implements Serializable{
 		while (!isPaused){
 			seedAtoms();
 			resetActionCount();
+			curStatsWorld = null;
 			for(turnCnt=0;turnCnt<turnsPerSeed;turnCnt++) {
 				//saveShotForTransformers();
 				nextTurn();
@@ -265,11 +277,16 @@ public class World implements Serializable{
 			updateIdleTransformers();
 			if(seedCnt % saveShotPeriod == 0) {
 				saveShotForTransformers();
-				printTrsfSpaceNames();
-				if(fileCntTransformers % saveSnapShotPeriod == 0) {
-					saveWorldSnapshot();
-					saveAnalytics();
-				}
+				//printTrsfSpaceNames();
+			}
+			if(seedCnt % saveSnapShotPeriod == 0) {
+				saveWorldSnapshot();
+			}
+			if(seedCnt % worldAnaliticsPeriod == 0) {
+				saveWorldAnalytics();
+			}
+			if(seedCnt % chainAnaliticsPeriod == 0) {
+				saveChainsAnalytics();
 			}
 			if(fileCntTransformers >= maxFilesCnt) { 
 				log.info("===== run finished =====");
@@ -278,13 +295,17 @@ public class World implements Serializable{
 		}
 	}
 
-	private void saveAnalytics() {
+	/**
+	 * print list of chains with ChainStatsSummary
+	 */
+	private void saveChainsAnalytics() {
 		List<Chain> chains = extractChains(3);	// minimum 3 links in a chain
-		String fileName = fileDir+"world_analytics_"+String.format("%05d",fileCntTransformers)+".txt";
+		String fileName = fileDir+"\\"+"chain_analytics_"+String.format("%07d",seedCnt)+".txt";
 		String line1 = buildWorldParamsTitle()+ "\n";
-		IntSummaryStatistics stats = chains.stream().mapToInt(Chain::getLength).summaryStatistics();
-		String line2 = "chains:"+stats.getCount()+", avgLength:"+String.format("%04.1f",stats.getAverage())
-			+", maxLength:"+String.format("%3d",stats.getMax())+"\n";
+		if(curStatsWorld == null) {
+			curStatsWorld = buildWorldStatsRecord(chains);
+		}		
+		String line2 = curStatsWorld+"\n";
 	    FileWriter fw=null;
 	    try {
 	        fw = new FileWriter(fileName,false);
@@ -292,12 +313,72 @@ public class World implements Serializable{
 	        PrintWriter out = new PrintWriter(bw);
 	        out.write(line1);
 	        out.write(line2);
-	        chains.stream().forEach(chain -> out.write(chain.getSummary()+"\n"));
+	        chains.stream().forEach(chain -> out.write(chain.getSummaryStr(seedCnt)+","+chain.getTrsfTypeList()+"\n"));
 	        out.close();
 	    } catch (IOException e) {
 	        e.printStackTrace();
 	    }	
-        log.info(" === Saved analytics {}",fileName);
+        log.info(" === Saved chain analytics {}",fileName);
+	}
+
+	private void saveWorldAnalytics() {
+		List<Chain> chains = extractChains(3);	// minimum 3 links in a chain
+		String fileName = fileDir+"\\"+"world_analytics.txt";
+		if(curStatsWorld == null) {
+			curStatsWorld = buildWorldStatsRecord(chains);
+		}
+		worldStats.add(curStatsWorld);
+	    FileWriter fw=null;
+	    try {
+	        fw = new FileWriter(fileName,true);
+	        BufferedWriter bw=new BufferedWriter(fw);
+	        PrintWriter out = new PrintWriter(bw);
+			if(worldStats.size() <= 1) {
+		        out.write(buildWorldParamsTitle()+ "\n");
+		        out.write(WorldStatsSummary.getCsvHeader()+ "\n");
+			}
+	        out.write(curStatsWorld.toCsv()+"\n");
+	        out.close();
+	    } catch (IOException e) {
+	        e.printStackTrace();
+	    }	
+        log.info(" === Saved world analytics {}",worldStats.size());
+	}
+
+	private WorldStatsSummary buildWorldStatsRecord(List<Chain> chains) {
+		IntSummaryStatistics statsLength = chains.stream().mapToInt(Chain::getLength).summaryStatistics();
+		IntSummaryStatistics statsLengthNonCirc = chains.stream()
+				.filter(c -> c.isCircular()==false)
+				.mapToInt(Chain::getLength).summaryStatistics();
+		DoubleSummaryStatistics statsStrength = chains.stream().mapToDouble(chain -> chain.getSummaryStats(seedCnt).getAvgStrength()).summaryStatistics();
+		DoubleSummaryStatistics statsStrengthNonCirc = chains.stream()
+				.filter(c -> c.isCircular()==false)
+				.mapToDouble(chain -> chain.getSummaryStats(seedCnt).getAvgStrength()).summaryStatistics();
+		DoubleSummaryStatistics statsAge = chains.stream().mapToDouble(chain -> chain.getSummaryStats(seedCnt).getAvgAge()).summaryStatistics();
+		DoubleSummaryStatistics statsAgeNonCirc = chains.stream()
+				.filter(c -> c.isCircular()==false)
+				.mapToDouble(chain -> chain.getSummaryStats(seedCnt).getAvgAge()).summaryStatistics();
+		WorldStatsSummary statsWorld= new WorldStatsSummary();
+		statsWorld.setCount(chains.size());
+		statsWorld.setAvgAge(statsAge.getAverage());
+		statsWorld.setAvgLength(statsLength.getAverage());
+		statsWorld.setAvgStrength(statsStrength.getAverage());
+		statsWorld.setCreatedSeedCnt(seedCnt);
+		statsWorld.setMaxAge((long)statsAge.getMax());
+		statsWorld.setMaxLength(statsLength.getMax());
+		statsWorld.setMaxStrength(statsStrength.getMax());
+		statsWorld.setMinAge((long)statsAge.getMin());
+		statsWorld.setMinStrength(statsStrength.getMin());
+		statsWorld.setCountNonCircular((int)statsAgeNonCirc.getCount());
+		statsWorld.setAvgAgeNonCircular(statsAgeNonCirc.getAverage());
+		statsWorld.setAvgLengthNonCircular(statsLengthNonCirc.getAverage());
+		statsWorld.setAvgStrengthNonCircular(statsStrengthNonCirc.getAverage());
+		statsWorld.setMaxAgeNonCircular((long)statsAgeNonCirc.getMax());
+		statsWorld.setMaxLengthNonCircular(statsLengthNonCirc.getMax());
+		statsWorld.setMaxStrengthNonCircular(statsStrengthNonCirc.getMax());
+		statsWorld.setMinAgeNonCircular((long)statsAgeNonCirc.getMin());
+		statsWorld.setMinStrengthNonCircular(statsStrengthNonCirc.getMin());
+		return statsWorld;
 	}
 
 	private List<Chain> extractChains(int minLength) {
@@ -402,7 +483,7 @@ public class World implements Serializable{
 	 */
 	private void saveWorldSnapshot() {
 		try {  
-			String fileName = fileDir+"world_snapshot_"+String.format("%05d",fileCntTransformers)+".trsf";
+			String fileName = fileDir+"\\"+"world_snapshot_"+String.format("%07d",seedCnt)+".trsf";
             FileOutputStream file = new FileOutputStream(fileName); 
             ObjectOutputStream out = new ObjectOutputStream(file); 
             out.writeObject(this); 
@@ -536,7 +617,7 @@ public class World implements Serializable{
 						&& !isCoordForbidden(trsf, tmpCoord, false)){
 						relocateTransformerTo(trsf, tmpCoord);
 						log.debug("=== tryMoveTransformerTowardsTo, standalone move allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
-						verifyTrsfPositions();
+						//verifyTrsfPositions();
 						return true;
 					}
 				}
@@ -557,7 +638,7 @@ public class World implements Serializable{
 						 */
 						log.debug("=== tryMoveTransformerTowardsTo, endOfChain whole chain pull allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
 						tearOffOrPullTransformer(trsf, tmpCoord);
-						verifyTrsfPositions();
+						//verifyTrsfPositions();
 						return true;
 					}
 				}
@@ -572,7 +653,7 @@ public class World implements Serializable{
 						if(enoughEnergyForMove(tmpLevel - curLevel)) {
 							log.debug("=== tryMoveTransformerTowardsTo, endOfChain tear off allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
 							relocateTransformerTo(trsf, tmpCoord);
-							verifyTrsfPositions();
+							//verifyTrsfPositions();
 							return true;
 						}
 					}
@@ -600,7 +681,7 @@ public class World implements Serializable{
 						 */
 						log.debug("=== tryMoveTransformerTowardsTo, inside chain whole chain move allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
 						moveTransformerWithLinks(trsf, tmpCoord, links);
-						verifyTrsfPositions();
+						//verifyTrsfPositions();
 						return true;
 					}
 				}
@@ -615,7 +696,7 @@ public class World implements Serializable{
 						if(enoughEnergyForMove(tmpLevel - curLevel)) {
 							log.debug("=== tryMoveTransformerTowardsTo, inside chain tear off allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
 							relocateTransformerTo(trsf, tmpCoord);
-							verifyTrsfPositions();
+							//verifyTrsfPositions();
 							return true;
 						}
 					}
@@ -965,7 +1046,7 @@ public class World implements Serializable{
 				}
 			}
 			++fileCntTransformers;
-	        String fileName = fileDir+"transformers_"+String.format("%05d",fileCntTransformers);
+	        String fileName = fileDir+"\\"+"transformers_"+String.format("%05d",fileCntTransformers);
 	        ImageIO.write(bi, "PNG", new File(fileName+".png"));
 	        //ImageIO.write(bi, "JPEG", new File("c:\\yourImageName.JPG"));	        
 	      	} catch (IOException ie) {
@@ -974,7 +1055,7 @@ public class World implements Serializable{
     		log.info(" === Saving transformes shot, seedCnt:{}, fileCntTransformers:{}", seedCnt, fileCntTransformers);
 	    }
 
-	private String buildWorldParamsTitle() {
+	public String buildWorldParamsTitle() {
 		String message = "Transformers, T:"+temperature+
 				", eScale:"+energyScale+
 				", idleWait:"+idleWait+
@@ -1622,5 +1703,28 @@ public class World implements Serializable{
 	public void setMassRatioLinked(int massRatioLinked) {
 		this.massRatioLinked = massRatioLinked;
 	}
-	
+
+	public int getReseedPct() {
+		return reseedPct;
+	}
+
+	public void setReseedPct(int reseedPct) {
+		this.reseedPct = reseedPct;
+	}
+
+	public int getWorldAnaliticsPeriod() {
+		return worldAnaliticsPeriod;
+	}
+
+	public void setWorldAnaliticsPeriod(int worldAnaliticsPeriod) {
+		this.worldAnaliticsPeriod = worldAnaliticsPeriod;
+	}
+	public int getChainAnaliticsPeriod() {
+		return chainAnaliticsPeriod;
+	}
+
+	public void setChainAnaliticsPeriod(int chainAnaliticsPeriod) {
+		this.chainAnaliticsPeriod = chainAnaliticsPeriod;
+	}
+
 }

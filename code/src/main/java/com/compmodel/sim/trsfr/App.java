@@ -3,8 +3,10 @@ package com.compmodel.sim.trsfr;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.Properties;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,35 +146,100 @@ public class App
 
     public static void main( String[] args ) {
 		if(args.length == 0) {
+			log.info("Starting world from random state with preset params");
 	        world = new World();
 	        world.seedTransformers();
-	        //saveWorldSnapshot(world);
-	        //log.info("Saved");
 		}else {
-			// Loading from D:\sergey\javaproj\trsfr\trsfr\world_snapshot.trsf
-			world = loadWorldSnapshot(args[0]);
-			changeSettings(world);
-			log.info("loaded {}", world);
+			log.info("Loading properties from "+args[0]);
+			Properties prop = loadProps(args[0]);
+			if(prop.getProperty("snapshotFile")!=null) {
+				world = loadWorldSnapshot(prop.getProperty("snapshotFile"));
+			}else {
+				log.info("Starting world from random state");
+		        world = new World();
+		        world.seedTransformers();
+			}
+			changeSettings(world,prop);
 		}
 		if(world != null) {
+			log.info(world.buildWorldParamsTitle());
 			world.run();
 		}
     }
 	
-	private static void changeSettings(World world2) {
-		//world.setActionDistancePenalty(0.3);
-		//world.setEnergyScale(0.5);
-		world.setFileDir("C:\\Users\\Aii3x\\sergey\\shots\\tmp\\");
-		//world.setIdleWait(3);
-		//world.setMassRatio(4);
-		//world.setMassRatioLinked(12);
+	private static Properties loadProps(String fileName) {
+		Properties prop = new Properties();
+		InputStream input = null;
+		try {
+			input = new FileInputStream(fileName);
+			prop.load(input);
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		} finally {
+			if (input != null) {
+				try {
+					input.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}	
+		return prop;
+	}
+
+	private static void changeSettings(World world2, Properties prop) {
+		if(prop.getProperty("energyScale") != null) {
+			world.setEnergyScale(Double.parseDouble(prop.getProperty("energyScale")));
+		}
+		if(prop.getProperty("searchDistance") != null) {
+			world.setSearchDistance(Integer.parseInt(prop.getProperty("searchDistance")));
+		}
+		if(prop.getProperty("actionDistancePenalty") != null) {
+			world.setActionDistancePenalty(Double.parseDouble(prop.getProperty("actionDistancePenalty")));
+		}
+		if(prop.getProperty("turnsPerSeed") != null) {
+			world.setTurnsPerSeed(Integer.parseInt(prop.getProperty("turnsPerSeed")));
+		}
+		if(prop.getProperty("reseedPct") != null) {
+			world.setReseedPct(Integer.parseInt(prop.getProperty("reseedPct")));
+		}
+		if(prop.getProperty("atomsNumber") != null) {
+			world.setAtomsNumber(Integer.parseInt(prop.getProperty("atomsNumber")));
+		}
+		if(prop.getProperty("trsfrNumber") != null) {
+			world.setTrsfrNumber(Integer.parseInt(prop.getProperty("trsfrNumber")));
+		}
+		if(prop.getProperty("massRatio") != null) {
+			world.setMassRatio(Integer.parseInt(prop.getProperty("massRatio")));
+		}
+		if(prop.getProperty("massRatioLinked") != null) {
+			world.setMassRatioLinked(Integer.parseInt(prop.getProperty("massRatioLinked")));
+		}
+		if(prop.getProperty("temperature") != null) {
+			world.setTemperature(Integer.parseInt(prop.getProperty("temperature")));
+		}
+		if(prop.getProperty("idleWait") != null) {
+			world.setIdleWait(Integer.parseInt(prop.getProperty("idleWait")));
+		}
+		if(prop.getProperty("maxFilesCnt") != null) {
+			world.setMaxFilesCnt(Integer.parseInt(prop.getProperty("maxFilesCnt")));
+		}
+		if(prop.getProperty("saveShotPeriod") != null) {
+			world.setSaveShotPeriod(Integer.parseInt(prop.getProperty("saveShotPeriod")));
+		}
+		if(prop.getProperty("saveSnapShotPeriod") != null) {
+			world.setSaveSnapShotPeriod(Integer.parseInt(prop.getProperty("saveSnapShotPeriod")));
+		}
+		if(prop.getProperty("chainAnaliticsPeriod") != null) {
+			world.setChainAnaliticsPeriod(Integer.parseInt(prop.getProperty("chainAnaliticsPeriod")));
+		}
+		if(prop.getProperty("worldAnaliticsPeriod") != null) {
+			world.setWorldAnaliticsPeriod(Integer.parseInt(prop.getProperty("worldAnaliticsPeriod")));
+		}
+		if(prop.getProperty("fileDir") != null) {
+			world.setFileDir(prop.getProperty("fileDir"));
+		}
 		world.setFileCntTransformers(0);
-		world.setMaxFilesCnt(500);
-		world.setSaveShotPeriod(500);
-		//world.setSearchDistance(6);
-		//world.setShowAtoms(true);
-		//world.setTemperature(10);
-		//world.setTurnsPerSeed(30);
 	}
 
 	/**
@@ -195,6 +262,7 @@ public class App
 			e.printStackTrace();
 			return null;
 		} 
+		log.info("loaded snapshot {}", fileName);
      	return world;
 	}
 

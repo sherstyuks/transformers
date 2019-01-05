@@ -19,24 +19,51 @@ public class Chain {
 		ages = new ArrayList<Long>();
 	}
 	
+	public String getTrsfTypeList() {
+		StringBuilder sb = new StringBuilder();
+		for(int i =0;i<links.size();i++) {
+			Transformer t = links.get(i);
+			sb.append(t.getInputType().toString()+t.getOutputType().toString());
+			if(i < links.size() -1) {
+				sb.append(".");
+			}
+		}
+		return sb.toString();
+	}
+	
 	public void addLink(Transformer trsf, double strength, long age) {
 		links.add(trsf);
 		strengths.add(strength);
 		ages.add(age);	
 	}
 
-	public String getSummary() {
+	public ChainStatsSummary getSummaryStats(long seedCnt) {
 		DoubleSummaryStatistics statsS = strengths.stream().mapToDouble(Double::valueOf).summaryStatistics();
 		LongSummaryStatistics statsA = ages.stream().mapToLong(Long::valueOf).summaryStatistics();
+		ChainStatsSummary stats = new ChainStatsSummary();
+		stats.setAvgAge(statsA.getAverage());
+		stats.setMaxAge(statsA.getMax());
+		stats.setMinAge(statsA.getMin());
+		stats.setAvgStrength(statsS.getAverage());
+		stats.setMaxStrength(statsS.getMax());
+		stats.setMinStrength(statsS.getMin());
+		stats.setCircular(isCircular);
+		stats.setCreatedSeedCnt(seedCnt);
+		stats.setTypeList(getTrsfTypeList());
+		return stats;
+	}
+	
+	public String getSummaryStr(long seedCnt) {
+		ChainStatsSummary stats = getSummaryStats(seedCnt);
 		StringBuilder sb = new StringBuilder();
 		sb.append("Size:").append(String.format("%3d",links.size())).append(",")
 		.append(isCircular)
-		.append(", Strength:").append(String.format("%04.1f",statsS.getAverage())).append("(")
-			.append(String.format("%04.1f",statsS.getMax())).append(",")
-			.append(String.format("%03.1f",statsS.getMin()))
-		.append("), Age:").append(String.format("%8d",(long)statsA.getAverage())).append("(")
-			.append(String.format("%8d",statsA.getMax())).append(",")
-			.append(String.format("%8d",statsA.getMin())).append(")");
+		.append(", Strength:").append(String.format("%04.1f",stats.getAvgStrength())).append("(")
+			.append(String.format("%04.1f",stats.getMaxStrength())).append(",")
+			.append(String.format("%03.1f",stats.getMinStrength()))
+		.append("), Age:").append(String.format("%8d",(long)stats.getAvgAge())).append("(")
+			.append(String.format("%8d",stats.getMaxAge())).append(",")
+			.append(String.format("%8d",stats.getMinAge())).append(")");
 		return sb.toString();
 	}
 	
