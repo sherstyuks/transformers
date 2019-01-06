@@ -9,6 +9,7 @@ public class ChainStatsSummary {
 	private long maxAge;
 	private long minAge;
 	private long createdSeedCnt;
+	private double matchTypePct;
 	private String typeList;
 	public boolean isCircular() {
 		return isCircular;
@@ -63,5 +64,11 @@ public class ChainStatsSummary {
 	}
 	public void setTypeList(String typeList) {
 		this.typeList = typeList;
+	}
+	public double getMatchTypePct() {
+		return matchTypePct;
+	}
+	public void setMatchTypePct(double matchTypePct) {
+		this.matchTypePct = matchTypePct;
 	}
 }

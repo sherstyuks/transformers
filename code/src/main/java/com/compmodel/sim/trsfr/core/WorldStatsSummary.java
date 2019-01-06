@@ -22,6 +22,9 @@ public class WorldStatsSummary implements Serializable{
 	private double avgAgeNonCircular;
 	private long maxAgeNonCircular;
 	private long minAgeNonCircular;
+	private double avgMatchPct;
+	private double maxMatchPct;
+	private double minMatchPct;
 	private long createdSeedCnt;
 
 	@Override
@@ -36,7 +39,10 @@ public class WorldStatsSummary implements Serializable{
 		.append(", minStrength:").append(String.format("%04.2f",minStrength))
 		.append(", avgAge:").append(String.format("%08.0f",avgAge))
 		.append(", maxAge:").append(String.format("%8d",maxAge))
-		.append(", minAge:").append(String.format("%6d",minAge));
+		.append(", minAge:").append(String.format("%6d",minAge))
+		.append(", avgMatchPct:").append(String.format("%04.1f",avgMatchPct))
+		.append(", maxMatchPct:").append(String.format("%04.1f",maxMatchPct))
+		.append(", minMatchPct:").append(String.format("%04.1f",minMatchPct));
 		return sb.toString();
 	}
 	
@@ -60,7 +66,10 @@ public class WorldStatsSummary implements Serializable{
 		.append(",").append(String.format("%4.2f",minStrengthNonCircular))
 		.append(",").append(String.format("%8.0f",avgAgeNonCircular))
 		.append(",").append(String.format("%d",maxAgeNonCircular))
-		.append(",").append(String.format("%d",minAgeNonCircular));
+		.append(",").append(String.format("%d",minAgeNonCircular))
+		.append(",").append(String.format("%4.1f",avgMatchPct))
+		.append(",").append(String.format("%4.1f",maxMatchPct))
+		.append(",").append(String.format("%4.1f",minMatchPct));
 		return sb.toString();
 	}
 	
@@ -84,7 +93,10 @@ public class WorldStatsSummary implements Serializable{
 		.append(",").append("minStrengthNonCircular")
 		.append(",").append("avgAgeNonCircular")
 		.append(",").append("maxAgeNonCircular")
-		.append(",").append("minAgeNonCircular");
+		.append(",").append("minAgeNonCircular")
+		.append(",").append("avgMatchPct")
+		.append(",").append("maxMatchPct")
+		.append(",").append("minMatchPct");
 		return sb.toString();
 	}
 
@@ -213,5 +225,29 @@ public class WorldStatsSummary implements Serializable{
 
 	public static long getSerialversionuid() {
 		return serialVersionUID;
+	}
+
+	public double getAvgMatchPct() {
+		return avgMatchPct;
+	}
+
+	public void setAvgMatchPct(double avgMatchPct) {
+		this.avgMatchPct = avgMatchPct;
+	}
+
+	public double getMaxMatchPct() {
+		return maxMatchPct;
+	}
+
+	public void setMaxMatchPct(double maxMatchPct) {
+		this.maxMatchPct = maxMatchPct;
+	}
+
+	public double getMinMatchPct() {
+		return minMatchPct;
+	}
+
+	public void setMinMatchPct(double minMatchPct) {
+		this.minMatchPct = minMatchPct;
 	}
 }

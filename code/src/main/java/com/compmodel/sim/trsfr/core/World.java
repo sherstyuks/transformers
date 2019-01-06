@@ -358,6 +358,7 @@ public class World implements Serializable{
 		DoubleSummaryStatistics statsAgeNonCirc = chains.stream()
 				.filter(c -> c.isCircular()==false)
 				.mapToDouble(chain -> chain.getSummaryStats(seedCnt).getAvgAge()).summaryStatistics();
+		DoubleSummaryStatistics statsMatchPct = chains.stream().mapToDouble(chain -> chain.getMatchTypePct()).summaryStatistics();
 		WorldStatsSummary statsWorld= new WorldStatsSummary();
 		statsWorld.setCount(chains.size());
 		statsWorld.setAvgAge(statsAge.getAverage());
@@ -378,6 +379,9 @@ public class World implements Serializable{
 		statsWorld.setMaxStrengthNonCircular(statsStrengthNonCirc.getMax());
 		statsWorld.setMinAgeNonCircular((long)statsAgeNonCirc.getMin());
 		statsWorld.setMinStrengthNonCircular(statsStrengthNonCirc.getMin());
+		statsWorld.setAvgMatchPct(statsMatchPct.getAverage());
+		statsWorld.setMaxMatchPct(statsMatchPct.getMax());
+		statsWorld.setMinMatchPct(statsMatchPct.getMin());
 		return statsWorld;
 	}
 

@@ -30,7 +30,23 @@ public class Chain {
 		}
 		return sb.toString();
 	}
-	
+
+	public double getMatchTypePct() {
+		int matchCnt = 0;
+		if(links.size() <=1) {
+			return 0.;
+		}
+		AtomTypeEnum prevType = links.get(0).getOutputType();
+		for(int i =1;i<links.size();i++) {
+			Transformer t = links.get(i);
+			if(t.getInputType() == prevType) {
+				matchCnt++;
+			}
+			prevType = t.getOutputType();
+		}
+		return matchCnt*100.0/links.size();
+	}
+
 	public void addLink(Transformer trsf, double strength, long age) {
 		links.add(trsf);
 		strengths.add(strength);
@@ -49,6 +65,7 @@ public class Chain {
 		stats.setMinStrength(statsS.getMin());
 		stats.setCircular(isCircular);
 		stats.setCreatedSeedCnt(seedCnt);
+		stats.setMatchTypePct(getMatchTypePct());
 		stats.setTypeList(getTrsfTypeList());
 		return stats;
 	}
@@ -63,7 +80,8 @@ public class Chain {
 			.append(String.format("%03.1f",stats.getMinStrength()))
 		.append("), Age:").append(String.format("%8d",(long)stats.getAvgAge())).append("(")
 			.append(String.format("%8d",stats.getMaxAge())).append(",")
-			.append(String.format("%8d",stats.getMinAge())).append(")");
+			.append(String.format("%8d",stats.getMinAge())).append(")")
+		.append(". matchPct:").append(String.format("%04.1f",stats.getMatchTypePct()));
 		return sb.toString();
 	}
 	
