@@ -13,12 +13,12 @@ public class Bond implements Serializable{
 	 * 
 	 */
 	private static final long serialVersionUID = 2427048054204742250L;
-	private Transformer transformer;
+	private Transformer neighbor;
 	private long actionCnt;
 	private long createdSeedCnt;
 	
-	public Bond(Transformer transformer, long actionCnt, long createdSeedCnt) {
-		this.transformer = transformer;
+	public Bond(Transformer neighbor, long actionCnt, long createdSeedCnt) {
+		this.neighbor = neighbor;
 		this.actionCnt = actionCnt;
 		this.createdSeedCnt = createdSeedCnt;
 	}
@@ -28,14 +28,14 @@ public class Bond implements Serializable{
 		if (diff <= 0) {
 			diff =1;
 		}
-		return (double)actionCnt/diff;
+		return 0.5*(double)actionCnt/diff;
 	}
 	
-	public Transformer getTransformer() {
-		return transformer;
+	public Transformer getNeighbor() {
+		return neighbor;
 	}
-	public void setTransformer(Transformer transformer) {
-		this.transformer = transformer;
+	public void setNeighbor(Transformer neighbor) {
+		this.neighbor = neighbor;
 	}
 	public long getActionCnt() {
 		return actionCnt;

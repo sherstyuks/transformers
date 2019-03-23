@@ -21,9 +21,26 @@ public class Coordinates  implements Serializable{
 		return coords;
 	}
 
+	public static Coordinates subtract(Coordinates c1, Coordinates c2) {
+		int[] resultC = new int[World.SPACE_DIM];
+		for(int i=0;i<World.SPACE_DIM;i++) {
+			resultC[i] = c1.getCoords()[i] - c2.getCoords()[i];
+		}
+		return new Coordinates(resultC);
+	}
+
+	public static Coordinates add(Coordinates c1, Coordinates c2) {
+		int[] resultC = new int[World.SPACE_DIM];
+		for(int i=0;i<World.SPACE_DIM;i++) {
+			resultC[i] = c1.getCoords()[i] + c2.getCoords()[i];
+		}
+		return new Coordinates(resultC);
+	}
+
 	public void setCoords(int[] coords) {
 		this.coords = coords;
 	}
+	
 	public static String deltaToString(Coordinates c1, Coordinates c2) {
 		return "["+(c1.getCoords()[0]-c2.getCoords()[0])+"]["
 				+(c1.getCoords()[1]-c2.getCoords()[1])+"]";
