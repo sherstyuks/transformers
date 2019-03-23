@@ -44,7 +44,7 @@ public class Chain {
 			}
 			prevType = t.getOutputType();
 		}
-		return matchCnt*100.0/links.size();
+		return matchCnt*100.0/(links.size()-1);
 	}
 
 	public void addLink(Transformer trsf, double strength, long age) {

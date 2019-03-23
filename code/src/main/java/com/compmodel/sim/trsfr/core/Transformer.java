@@ -90,20 +90,31 @@ public class Transformer implements Serializable {
 		}
 		int linkedCount = 0;
 		for(Bond curBond : bonds) {
-			if(curLevelChain.contains(curBond.getTransformer())) {
+			if(curLevelChain.contains(curBond.getNeighbor())) {
 				continue;
 			}
 			linkedCount++;
-			curLevelChain.add(curBond.getTransformer()); 
-			int linkedCountNeighb = curBond.getTransformer().getLinkedCount(curLevelChain);
+			curLevelChain.add(curBond.getNeighbor()); 
+			int linkedCountNeighb = curBond.getNeighbor().getLinkedCount(curLevelChain);
 			linkedCount += linkedCountNeighb;
 		}
 		return linkedCount;	
 	}
 
+	/**
+	 * Mthod that calculates list of all transformers that have linked to this via bonds.
+	 * "This" is included
+	 * Takes input curLevelLinks array and adds links from neighbors recursively.
+	 * 
+	 * @param curLevelLinks
+	 * @return
+	 */
 	public ArrayList<Transformer> getLinked(ArrayList<Transformer> curLevelLinks) {
 		if(bonds.size() == 0) {
-			return curLevelLinks;	// Standalone transformer
+			// Standalone transformer, unrealistic scenario, but handling just in case
+			curLevelLinks = new ArrayList<Transformer>();
+			curLevelLinks.add(this);	
+			return curLevelLinks;	
 		}
 		if(curLevelLinks == null) {
 			// Call from the top level
@@ -111,9 +122,9 @@ public class Transformer implements Serializable {
 		}
 		curLevelLinks.add(this);	
 		for(Bond curBond : bonds) {
-			Transformer curBondTrsf = curBond.getTransformer();
+			Transformer curBondTrsf = curBond.getNeighbor();
 			if(!curLevelLinks.contains(curBondTrsf)) { // to detect circular chain or link back to self
-				curLevelLinks = curBond.getTransformer().getLinked(curLevelLinks); 
+				curLevelLinks = curBond.getNeighbor().getLinked(curLevelLinks); 
 			}
 		}
 		return curLevelLinks;	
@@ -129,6 +140,8 @@ public class Transformer implements Serializable {
 	 * otherwise:
 	 *  - return null;
 	 * @return
+	 * 
+	 * Not used
 	 */
 	private Atom findAndTransform(World world) {
 		ArrayList<Atom> vicinity = world.getAtomsInVicinity(coords, World.SEARCH_DISTANCE);
@@ -146,12 +159,24 @@ public class Transformer implements Serializable {
 		return null;
 	}
 
+	/**
+	 * If this transformer matches input atom type:
+	 *  - transform (change atom type)
+	 *  - increase actionCnt for the previous atom's actor
+	 *  - increase actionCnt for bonds (this -> previousActor) and (previousActor -> this)
+	 *  - set this as a new actor for the atom
+	 *  - increase actionCnt for this transformer
+	 *  - reset idleCnt for this transformer
+	 *  
+	 * @param input
+	 * @return
+	 */
 	public Atom tryTransform(Atom input) {
 		synchronized(input) {
 			if(input.getType().equals(inputType)) {
 				input.setType(outputType);
-				updateBondActionCnt(input.getActor());
-				input.transform(outputType, this);
+				updateBondsActionCnt(input.getActor());
+				input.setActor(this);
 				actionCnt++;
 				idleCnt = 0;
 				return input;
@@ -160,14 +185,17 @@ public class Transformer implements Serializable {
 		return null;
 	}
 	
-	private void updateBondActionCnt(Transformer actor) {
+	/*
+	 * Increase actionCnt for bonds (this -> previousActor) and (previousActor -> this)
+	 */
+	private void updateBondsActionCnt(Transformer prevActor) {
 		for(Bond bond : bonds) {
-			if(bond.getTransformer() == actor) {
+			if(bond.getNeighbor() == prevActor) {
 				long newActionCnt = bond.getActionCnt() + 1;
 				bond.setActionCnt(newActionCnt);
-				for(Bond actorBond : actor.getBonds()) {
-					if(actorBond.getTransformer() == this) {
-						actorBond.setActionCnt(newActionCnt);
+				for(Bond prevActorBond : prevActor.getBonds()) {
+					if(prevActorBond.getNeighbor() == this) {
+						prevActorBond.setActionCnt(newActionCnt);
 						break;
 					}
 				}
@@ -190,7 +218,7 @@ public class Transformer implements Serializable {
 	public double getEnergyLevel(Coordinates newCoords, long curSeedCnt) {
 		double level = 0.0;
 		for(Bond bond:bonds){
-			level += (Coordinates.calcDistance(bond.getTransformer().getCoords(), newCoords) - 1)
+			level += (Coordinates.calcDistance(bond.getNeighbor().getCoords(), newCoords) - 1)
 					* bond.getStrength(curSeedCnt);
 		}	
 		return level;
@@ -198,7 +226,7 @@ public class Transformer implements Serializable {
 	
 	public boolean hasNeighbor(Transformer trsf) {
 		for(Bond bond :bonds) {
-			if(bond.getTransformer() == trsf) {
+			if(bond.getNeighbor() == trsf) {
 				return true;
 			}
 		}
@@ -208,7 +236,7 @@ public class Transformer implements Serializable {
 	public boolean removeNeighbor(Transformer trsf) {
 		Bond toRemove = null;;
 		for(Bond bond :bonds) {
-			if(bond.getTransformer() == trsf) {
+			if(bond.getNeighbor() == trsf) {
 				toRemove = bond;
 				break;
 			}
@@ -228,14 +256,26 @@ public class Transformer implements Serializable {
 
 
 	/**
-	 * Create new bond with initial strength 1
-	 * Bond is created bi-directionally
+	 * Create pair of bonds with initial strength 1
+	 * (this -> trsf) and (trsf -> this)
 	 * @param trsf
 	 */
 	public void addNeighbor(Transformer trsf, long createdSeedCnt) {
 		if(!hasNeighbor(trsf)) {
+			if(bonds.size()>2) {
+				log.error("!!! too many bonds in trsfr-initiator, this:"+getShortInfo());
+			}
+			if(trsf.hasNeighbor(this)) {
+				log.error("!!! attaching trsf that has this as a neighbor already, trsf:"+getShortInfo());			
+			}
+			if(trsf.getBonds().size()>2) {
+				log.error("!!! too many bonds in trsfr-attachment, trsf:"+trsf.getShortInfo());
+			}
 			bonds.add(new Bond(trsf, 1l, createdSeedCnt));
 			trsf.getBonds().add(new Bond(this, 1l, createdSeedCnt));
+			log.debug("created bonds between "+this+" and "+trsf);
+		}else {
+			log.debug("attmept to add tsrf that is already a neighbor, this:"+getShortInfo()+", tsrf:"+trsf.getShortInfo());
 		}
 	}
 
@@ -248,7 +288,24 @@ public class Transformer implements Serializable {
 		StringBuilder sb = new StringBuilder();
 		sb.append(getShortInfo()).append("(");
 		for(Bond bond:getBonds()) {
-			sb.append(bond.getTransformer().getShortInfo()).append(":");
+			sb.append(bond.getNeighbor().getShortInfo()).append(":");
+		}
+		sb.append(")");
+		return sb.toString();
+	}
+
+	public String getFullInfoWithBonds(long curSeedCnt) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(getShortInfo())
+			.append(", idleCnt=").append(idleCnt)
+			.append(", actionCnt=").append(actionCnt)
+			.append("(");
+		for(Bond bond:getBonds()) {
+			sb.append(bond.getNeighbor().getShortInfo())
+				.append(", bondActionCnt=").append(bond.getActionCnt())
+				.append(", bondCreatedCnt=").append(bond.getCreatedSeedCnt())
+				.append(", bondStrength=").append(String.format("%8.2f",bond.getStrength(curSeedCnt)))
+			.append(" : ");
 		}
 		sb.append(")");
 		return sb.toString();
