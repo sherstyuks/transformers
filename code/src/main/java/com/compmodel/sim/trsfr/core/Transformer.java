@@ -19,24 +19,24 @@ import org.slf4j.LoggerFactory;
 public class Transformer implements Serializable {
 	private static final long serialVersionUID = -6590101303799725788L;
 	private static final Logger log = LoggerFactory.getLogger(Transformer.class);
-	private static final Color COLOR_AB = new Color(255,102,102); 	// Very light red
-	private static final Color COLOR_AC = new Color(255,0,0); 		// Red
-	private static final Color COLOR_AD = new Color(153,0,0); 		// Very dark red
+	private static final Color COLOR_AB = new Color(255,0,0); 			// Red
+	private static final Color COLOR_AC = new Color(250,0,255); 		// Ryzhij
+	private static final Color COLOR_AD = new Color(198,130,109); 		// Purple
 	private static final Color COLOR_AE = Color.BLACK; // not used
 	private static final Color COLOR_AF = Color.BLACK; // not used
-	private static final Color COLOR_BA = new Color(51,204,255); 	// Very light blue
-	private static final Color COLOR_BC = new Color(0,0,255); 		// Blue
-	private static final Color COLOR_BD = new Color(0,0,153); 		// Very dark blue
+	private static final Color COLOR_BA = new Color(156,244,243); 		// Light cyan
+	private static final Color COLOR_BC = new Color(117,209,207); 		// Blue
+	private static final Color COLOR_BD = new Color(0,0,153); 			// Green-blue
 	private static final Color COLOR_BE = Color.BLACK; // not used
 	private static final Color COLOR_BF = Color.BLACK; // not used
-	private static final Color COLOR_CA = new Color(102,255,102); 	// Very light green
-	private static final Color COLOR_CB = new Color(0,255,0); 		// Green
-	private static final Color COLOR_CD = new Color(0,102,0); 		// Very dark green
+	private static final Color COLOR_CA = new Color(49,137,80); 		// Very dark green
+	private static final Color COLOR_CB = new Color(183,209,117); 		// Green
+	private static final Color COLOR_CD = new Color(58,163,254); 		// Dark green
 	private static final Color COLOR_CE = Color.BLACK; // not used
 	private static final Color COLOR_CF = Color.BLACK; // not used
-	private static final Color COLOR_DA = new Color(153,102,0); 	// Light brown
-	private static final Color COLOR_DB = new Color(102,51,102); 	// Brown
-	private static final Color COLOR_DC = new Color(51,0,0); 		// Very dark brown
+	private static final Color COLOR_DA = new Color(244,236,124); 		// Light yellow
+	private static final Color COLOR_DB = new Color(129,105,244); 		// Violet
+	private static final Color COLOR_DC = new Color(144,58,163); 		// Very dark violet
 	private static final Color COLOR_DE = Color.BLACK; // not used
 	private static final Color COLOR_DF = Color.BLACK; // not used
 	private static final Color COLOR_EA = Color.BLACK; // not used
@@ -57,9 +57,11 @@ public class Transformer implements Serializable {
 	private ArrayList<Bond> bonds;
 	private int idleCnt;	// number of seeds with no actions, since last action
 	private int actionCnt;	// number of actions since last seed
+	private String name;
 
 	private AtomTypeEnum inputType;
 	private AtomTypeEnum outputType;
+
 	public Transformer(Coordinates coords, AtomTypeEnum inputType, AtomTypeEnum outputType) {
 		id = UUID.randomUUID();
 		bonds = new ArrayList<Bond>();
@@ -68,9 +70,10 @@ public class Transformer implements Serializable {
 		this.outputType = outputType;
 		idleCnt = 0;
 		actionCnt = 0;
+		name = buildName();;
 	}
 
-	public String getName() {
+	public String buildName() {
 		return inputType.name()+outputType.name()+"_"+id.toString().substring(28);
 	}
 
@@ -102,7 +105,7 @@ public class Transformer implements Serializable {
 	}
 
 	/**
-	 * Mthod that calculates list of all transformers that have linked to this via bonds.
+	 * Method that calculates list of all transformers that have linked to this via bonds.
 	 * "This" is included
 	 * Takes input curLevelLinks array and adds links from neighbors recursively.
 	 * 
@@ -188,7 +191,7 @@ public class Transformer implements Serializable {
 	/*
 	 * Increase actionCnt for bonds (this -> previousActor) and (previousActor -> this)
 	 */
-	private void updateBondsActionCnt(Transformer prevActor) {
+	private synchronized void updateBondsActionCnt(Transformer prevActor) {
 		for(Bond bond : bonds) {
 			if(bond.getNeighbor() == prevActor) {
 				long newActionCnt = bond.getActionCnt() + 1;
@@ -196,6 +199,9 @@ public class Transformer implements Serializable {
 				for(Bond prevActorBond : prevActor.getBonds()) {
 					if(prevActorBond.getNeighbor() == this) {
 						prevActorBond.setActionCnt(newActionCnt);
+						log.trace("updateBondsActionCnt, set newActionCnt="+newActionCnt
+							+" for bonds between this:"+getShortInfo()+" and prevActor:"+prevActor.getShortInfo()
+							+", this.bond:"+bond+", prevActor.bond:"+prevActorBond);
 						break;
 					}
 				}
@@ -233,18 +239,43 @@ public class Transformer implements Serializable {
 		return false;
 	}
 	
-	public boolean removeNeighbor(Transformer trsf) {
-		Bond toRemove = null;;
+	/**
+	 * Removes bond from this to neighborToRemove.
+	 * if removeBothSides==true also remove bond from neighborToRemove to this.
+	 * 
+	 * @param neighborToRemove
+	 * @return
+	 */
+	public synchronized boolean removeNeighbor(Transformer neighborToRemove, boolean removeBothSides, String comments) {
+		Bond toRemoveFromThis = null, toRemoveFromNeighbor=null;
 		for(Bond bond :bonds) {
-			if(bond.getNeighbor() == trsf) {
-				toRemove = bond;
+			if(bond.getNeighbor() == neighborToRemove) {
+				toRemoveFromThis = bond;
 				break;
 			}
 		}
-		if(toRemove != null) {
-			bonds.remove(toRemove);
+		if(toRemoveFromThis != null) {
+			bonds.remove(toRemoveFromThis);
+			log.debug("removeNeighbor, direct bond, from this:"+getShortInfo()+" removed neighbor:"+neighborToRemove.getShortInfo()
+				+", bondFromThis:"+toRemoveFromThis+comments);
+			if(removeBothSides) {
+				for(Bond neighborBond:neighborToRemove.getBonds()) {
+					if(neighborBond.getNeighbor() == this) {
+						toRemoveFromNeighbor = neighborBond;
+						break;
+					}
+				}
+				if(toRemoveFromNeighbor != null) {
+					neighborToRemove.getBonds().remove(toRemoveFromNeighbor);
+					log.debug("removeNeighbor, backward bond, from neighborToRemove:"+neighborToRemove.getShortInfo()+" removed this:"+getShortInfo()
+					+", bondFromNeighbor:"+toRemoveFromNeighbor+comments);
+				}else {
+					log.error("Neighbor transformer:"+neighborToRemove.getShortInfo()+" does not have this:"+getShortInfo()+" as a neighbor"+comments);					
+				}
+			}
 			return true;
 		}
+		log.error("This transformer "+getShortInfo()+" does not have requested neighbor to remove:"+neighborToRemove.getShortInfo()+comments);
 		return false;
 	}
 
@@ -260,28 +291,29 @@ public class Transformer implements Serializable {
 	 * (this -> trsf) and (trsf -> this)
 	 * @param trsf
 	 */
-	public void addNeighbor(Transformer trsf, long createdSeedCnt) {
+	public synchronized void addNeighbor(Transformer trsf, long createdSeedCnt, String comments) {
 		if(!hasNeighbor(trsf)) {
 			if(bonds.size()>2) {
-				log.error("!!! too many bonds in trsfr-initiator, this:"+getShortInfo());
+				log.error("seedCnt="+createdSeedCnt+"Too many bonds in trsfr-initiator, this:"+getShortInfo()+comments);
 			}
 			if(trsf.hasNeighbor(this)) {
-				log.error("!!! attaching trsf that has this as a neighbor already, trsf:"+getShortInfo());			
+				log.error("seedCnt="+createdSeedCnt+"Attaching trsf that has this as a neighbor already, trsf:"+getShortInfo()+comments);			
 			}
 			if(trsf.getBonds().size()>2) {
-				log.error("!!! too many bonds in trsfr-attachment, trsf:"+trsf.getShortInfo());
+				log.error("seedCnt="+createdSeedCnt+"Too many bonds in trsfr-attachment, trsf:"+trsf.getShortInfo()+comments);
 			}
 			bonds.add(new Bond(trsf, 1l, createdSeedCnt));
 			trsf.getBonds().add(new Bond(this, 1l, createdSeedCnt));
-			log.debug("created bonds between "+this+" and "+trsf);
+			log.debug("seedCnt="+createdSeedCnt+", created bonds between "+this+" and "+trsf + comments);
 		}else {
-			log.debug("attmept to add tsrf that is already a neighbor, this:"+getShortInfo()+", tsrf:"+trsf.getShortInfo());
-		}
+			log.error("seedCnt="+createdSeedCnt+", attmept to add tsrf that is already a neighbor, this:"+getShortInfo()+", tsrf:"+trsf.getShortInfo()+comments);
+		}			
 	}
 
 	public String getShortInfo() {
 		String name =  this.toString(); 
-		return inputType.toString()+outputType.toString()+name.substring(name.length()-9)+ getCoords();
+		int atPos = name.indexOf("@");
+		return inputType.toString()+outputType.toString()+name.substring(atPos)+ getCoords();
 	}
 
 	public String getShortInfoWithBonds() {
@@ -299,15 +331,15 @@ public class Transformer implements Serializable {
 		sb.append(getShortInfo())
 			.append(", idleCnt=").append(idleCnt)
 			.append(", actionCnt=").append(actionCnt)
-			.append("(");
+			.append("{");
 		for(Bond bond:getBonds()) {
-			sb.append(bond.getNeighbor().getShortInfo())
-				.append(", bondActionCnt=").append(bond.getActionCnt())
-				.append(", bondCreatedCnt=").append(bond.getCreatedSeedCnt())
-				.append(", bondStrength=").append(String.format("%8.2f",bond.getStrength(curSeedCnt)))
-			.append(" : ");
+			sb.append("[").append(bond.getNeighbor().getShortInfo())
+				.append(",bondActionCnt=").append(bond.getActionCnt())
+				.append(",bondCreatedCnt=").append(bond.getCreatedSeedCnt())
+				.append(",bondStrength=").append(String.format("%5.2f",bond.getStrength(curSeedCnt)))
+			.append("] ");
 		}
-		sb.append(")");
+		sb.append("}");
 		return sb.toString();
 	}
 
@@ -569,6 +601,21 @@ public class Transformer implements Serializable {
 
 	public void setBonds(ArrayList<Bond> bonds) {
 		this.bonds = bonds;
+	}
+
+	public double getTotalBondStrength(long curSeedCnt) {
+		double  total = 0.;
+		for(Bond b:bonds) {
+			total += b.getStrength(curSeedCnt);
+		}
+		return total;
+	}
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
 	}
 
 

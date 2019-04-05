@@ -236,6 +236,9 @@ public class App
 		if(prop.getProperty("worldAnaliticsPeriod") != null) {
 			world.setWorldAnaliticsPeriod(Integer.parseInt(prop.getProperty("worldAnaliticsPeriod")));
 		}
+		if(prop.getProperty("collisionWinTrs") != null) {
+			world.setCollisionWinTrs(Double.parseDouble(prop.getProperty("collisionWinTrs")));
+		}
 		if(prop.getProperty("fileDir") != null) {
 			world.setFileDir(prop.getProperty("fileDir"));
 		}

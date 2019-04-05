@@ -27,16 +27,29 @@ package com.compmodel.sim.trsfr;
  *  
  *  Small size of stable sets makes them easier to move around.
  *  On the other side, sets working in compact space are unlikely to exhibit repeatable behavior,
- *  interaction is random.
+ *  interaction is random. Repeatable behavior is more likely in chains.
  *  
  *  For current transformers model the apparent way to select combinations - 
- *  encourage those with the longer lifetime. Circular chains will obviously become winners.
- *  1. Increase ACTION_DISTANCE_PENALTY - to encourage match in chans
+ *  encourage those with the longer lifetime. 
  *  
- *  Let's call stable sets "stabs".
- *  Components of a stabs, to be produced and consumed as a whole, must be aware about container. 
- *  What does it mean? 
- * 
+ *  The mechanism to select stable sets will be competition.
+ *  
+ *  For the lowest level, chains, we can suggest following competition implementations:
+ *  1. Chain with stronger bonds can break another one with weaker bonds. 
+ *     Collision may happen when moving. We can allow breaking when trsf is trying to move to the place in space that is
+ *     already occupied. 
+ *     We can limit breaking action to the situaition when end of the chain collides only.
+ *  2. Bonds can weaken and disappear if no regular actions occur.
+ *  
+ *  The first option is potentially more interesting, because it may induce creation of spatial constructions.
+ *  
+ *  How it will work on other levels, and how to produce these levels - yet to be seen. 
+ *  
+ *
+ *
+ *
+ *
+ *
  * @author shers
  *
  */
