@@ -631,7 +631,7 @@ public class World implements Serializable{
 	 * @return
 	 */
 	private boolean tryMoveTransformerTowardsTo(Transformer trsf, Coordinates newCoord) {
-		double trsfrMoveThr = 1.0 - 1.0/massRatio;	// threshold to move or tear off single transformer
+		double sinfleTrsfrMoveThr = 1.0 - 1.0/massRatio;	// threshold to move or tear off single transformer
 		double chainMoveThr = 1.0 - 1.0/(massRatioLinked * (trsf.getLinkedCount(null) +1));	// threshold to move the whole chain
 		double rnd = rand.nextDouble();
 		Coordinates curCoord = trsf.getCoords();
@@ -642,7 +642,7 @@ public class World implements Serializable{
 		int neighbCnt = trsf.getBonds().size();
 		if(neighbCnt == 0) {
 			// === standalone transformer
-			if(rnd > trsfrMoveThr) {
+			if(rnd > sinfleTrsfrMoveThr) {
 				for(Coordinates tmpCoord : vicinity) {
 					if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
 						&& !isCoordForbidden(trsf, tmpCoord, false)){
@@ -701,7 +701,7 @@ public class World implements Serializable{
 		}*/
 		else {
 			// === inside the chain
-			chainMoveThr = 0.;
+			//chainMoveThr = 0.;
 			if(rnd > chainMoveThr) {
 				// first, try to move the chain
 				ArrayList<Transformer> links = trsf.getLinked(null);
@@ -722,7 +722,7 @@ public class World implements Serializable{
 					}
 				}
 				log.trace("=== tryMoveTransformerTowardsTo, seedCnt:"+seedCnt+", inside chain whole chain move failed, no place for "+trsf.getShortInfo());
-			}else if(rnd > trsfrMoveThr) {
+			}else if(rnd > sinfleTrsfrMoveThr) {
 				// next try to tear off the single trsf
 				for(Coordinates tmpCoord : vicinity) {
 					if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
