@@ -603,6 +603,30 @@ public class Transformer implements Serializable {
 		this.bonds = bonds;
 	}
 
+	public double getTotalBondStrength(long curSeedCnt, int distance) {
+		double  total = 0.;
+		for(Bond b:bonds) {
+			total += b.getStrength(curSeedCnt);
+			if(distance > 0) {
+				total += b.getNeighbor().getOneSideTotalStrengh(curSeedCnt,(distance - 1),this);
+			}
+		}
+		return total;
+	}
+
+	private double getOneSideTotalStrengh(long curSeedCnt, int distance, Transformer otherSideTrsf) {
+		double  total = 0.;
+		for(Bond b:bonds) {
+			if(otherSideTrsf != b.getNeighbor()) {
+				total += b.getStrength(curSeedCnt);
+				if(--distance > 0) {
+					total += b.getNeighbor().getOneSideTotalStrengh(curSeedCnt,distance,this);
+				}
+			}
+		}
+		return total;
+	}
+
 	public double getTotalBondStrength(long curSeedCnt) {
 		double  total = 0.;
 		for(Bond b:bonds) {
@@ -616,6 +640,28 @@ public class Transformer implements Serializable {
 
 	public void setName(String name) {
 		this.name = name;
+	}
+
+	/**
+	 * Cross correlation of this and transformer
+	 * - if both inputType and outputType matches - return 1
+	 * - if either nputType or outputType matches - return 0
+	 * - if neithet matches - return 0
+	 * @param trsf
+	 * @return
+	 */
+	public int cross(Transformer trsf) {
+		if(trsf.getInputType() == inputType) {
+			if(trsf.getOutputType() == outputType){
+				return 1;
+			}else {
+				return 0;
+			}
+		}else if(trsf.getOutputType() == outputType){
+			return 0;
+		}else {
+			return 0;
+		}
 	}
 
 

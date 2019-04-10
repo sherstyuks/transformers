@@ -26,23 +26,23 @@ public class WorldStatsSummary implements Serializable{
 	private double maxMatchPct;
 	private double minMatchPct;
 	private long createdSeedCnt;
+	private double avgAutoCorr;
+	private double avgPrevCorr;
 
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append("seedCnt:").append(String.format("%8d",createdSeedCnt))
-		.append(", chainsCnt:").append(String.format("%4d",count))
-		.append(", avgLength:").append(String.format("%04.1f",avgLength))
-		.append(", maxLength:").append(String.format("%4d",maxLength))
-		.append(", avgStrength:").append(String.format("%05.2f",avgStrength))
-		.append(", maxStrength:").append(String.format("%05.2f",maxStrength))
-		.append(", minStrength:").append(String.format("%04.2f",minStrength))
-		.append(", avgAge:").append(String.format("%08.0f",avgAge))
-		.append(", maxAge:").append(String.format("%8d",maxAge))
-		.append(", minAge:").append(String.format("%6d",minAge))
-		.append(", avgMatchPct:").append(String.format("%04.1f",avgMatchPct))
-		.append(", maxMatchPct:").append(String.format("%04.1f",maxMatchPct))
-		.append(", minMatchPct:").append(String.format("%04.1f",minMatchPct));
+		.append(", chains:").append(String.format("%4d",count))
+		.append(", avgL:").append(String.format("%3d",(int)avgLength))
+		.append(", maxL:").append(String.format("%4d",maxLength))
+		.append(", avgStrg:").append(String.format("%4.1f",avgStrength))
+		.append(", maxStrg:").append(String.format("%4.1f",maxStrength))
+		.append(", avgAge:").append(String.format("%6d",(int)avgAge))
+		.append(", maxAge:").append(String.format("%6d",maxAge))
+		.append(", avgMatch:").append(String.format("%3d",(int)avgMatchPct))
+		.append(", avgAutoC:").append(String.format("%3.2f",avgAutoCorr))
+		.append(", avgPrevC:").append(String.format("%3.2f",avgPrevCorr));
 		return sb.toString();
 	}
 	
@@ -50,26 +50,22 @@ public class WorldStatsSummary implements Serializable{
 		StringBuilder sb = new StringBuilder();
 		sb.append(String.format("%d",createdSeedCnt))
 		.append(",").append(String.format("%d",count))
-		.append(",").append(String.format("%4.1f",avgLength))
-		.append(",").append(String.format("%d",maxLength))
-		.append(",").append(String.format("%5.2f",avgStrength))
-		.append(",").append(String.format("%5.2f",maxStrength))
-		.append(",").append(String.format("%4.2f",minStrength))
-		.append(",").append(String.format("%8.0f",avgAge))
-		.append(",").append(String.format("%d",maxAge))
-		.append(",").append(String.format("%d",minAge))
-		.append(",").append(String.format("%d",countNonCircular))
-		.append(",").append(String.format("%4.1f",avgLengthNonCircular))
-		.append(",").append(String.format("%d",maxLengthNonCircular))
-		.append(",").append(String.format("%5.2f",avgStrengthNonCircular))
-		.append(",").append(String.format("%5.2f",maxStrengthNonCircular))
-		.append(",").append(String.format("%4.2f",minStrengthNonCircular))
-		.append(",").append(String.format("%8.0f",avgAgeNonCircular))
-		.append(",").append(String.format("%d",maxAgeNonCircular))
-		.append(",").append(String.format("%d",minAgeNonCircular))
-		.append(",").append(String.format("%4.1f",avgMatchPct))
-		.append(",").append(String.format("%4.1f",maxMatchPct))
-		.append(",").append(String.format("%4.1f",minMatchPct));
+		.append(",").append(String.format("%3d",(int)avgLength))
+		.append(",").append(String.format("%3d",maxLength))
+		.append(",").append(String.format("%4.1f",avgStrength))
+		.append(",").append(String.format("%4.1f",maxStrength))
+		.append(",").append(String.format("%5d",(int)avgAge))
+		.append(",").append(String.format("%6d",maxAge))
+		.append(",").append(String.format("%6d",countNonCircular))
+		.append(",").append(String.format("%4d",(int)avgLengthNonCircular))
+		.append(",").append(String.format("%3d",maxLengthNonCircular))
+		.append(",").append(String.format("%4.1f",avgStrengthNonCircular))
+		.append(",").append(String.format("%4.1f",maxStrengthNonCircular))
+		.append(",").append(String.format("%4d",(int)avgAgeNonCircular))
+		.append(",").append(String.format("%6d",maxAgeNonCircular))
+		.append(",").append(String.format("%3d%%",(int)avgMatchPct))
+		.append(",").append(String.format("%3.2f",avgAutoCorr))
+		.append(",").append(String.format("%3.2f",avgPrevCorr));
 		return sb.toString();
 	}
 	
@@ -96,7 +92,9 @@ public class WorldStatsSummary implements Serializable{
 		.append(",").append("minAgeNonCircular")
 		.append(",").append("avgMatchPct")
 		.append(",").append("maxMatchPct")
-		.append(",").append("minMatchPct");
+		.append(",").append("minMatchPct")
+		.append(",").append("avgAutoCorr")
+		.append(",").append("avgPrevCorr");
 		return sb.toString();
 	}
 
@@ -249,5 +247,21 @@ public class WorldStatsSummary implements Serializable{
 
 	public void setMinMatchPct(double minMatchPct) {
 		this.minMatchPct = minMatchPct;
+	}
+
+	public double getAvgAutoCorr() {
+		return avgAutoCorr;
+	}
+
+	public void setAvgAutoCorr(double avgAutoCorr) {
+		this.avgAutoCorr = avgAutoCorr;
+	}
+
+	public double getAvgPrevCorr() {
+		return avgPrevCorr;
+	}
+
+	public void setAvgPrevCorr(double avgPrevCorr) {
+		this.avgPrevCorr = avgPrevCorr;
 	}
 }

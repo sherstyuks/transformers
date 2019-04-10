@@ -20,6 +20,8 @@ import java.util.DoubleSummaryStatistics;
 import java.util.HashMap;
 import java.util.IntSummaryStatistics;
 import java.util.List;
+import java.util.Map;
+import java.util.OptionalDouble;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -27,6 +29,8 @@ import javax.imageio.ImageIO;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.compmodel.sim.trsfr.analytics.Correlator;
 /**
  * Notes
  * General principle:
@@ -172,7 +176,7 @@ public class World implements Serializable{
 	 */
 	public static final int ATOM_TYPE_NUMBER=4;	// Number of atom types
 	public static final int SPACE_DIM = 2;
-	public static final int SPACE_SIZE = 200;
+	public static final int SPACE_SIZE = 300;
 	public static final int ATOMS_NUMBER = 3000;
 	public static final int TRSFR_NUMBER = 1000;
 	public static final int MAX_TEMPERATURE = 100;
@@ -192,7 +196,7 @@ public class World implements Serializable{
 	private static final int SAVE_SNAPSHOT_PERIOD = 1000; // save world snapshot every XX seedCnt
 	private static final int CHAIN_ANALYTICS_PERIOD = 1000; // save  chain analytics every XX seedCnt
 	private static final int WORLD_ANALYTICS_PERIOD = 1000; // build  WorldStatsSummary every XX seedCnt
-	private static final double COLLISION_WIN_TRS = 0.1; // threshold for totalBondStrength that will allow passive chain to break during collision
+	private static final double COLLISION_WIN_TRS = 0.3; // threshold for totalBondStrength that will allow passive chain to break during collision
 	private static final boolean SHOW_ATOMS = true; 
 	private static final String FILE_DIR = "D:\\Projects\\trsfr\\shots\\shots01\\"; 
 	private static final long RANDOM_SEED = 3432716543l;
@@ -228,12 +232,18 @@ public class World implements Serializable{
 	public ArrayList<Transformer> transformers;
 	private ArrayList<WorldStatsSummary> worldStats;
 	private transient WorldStatsSummary curStatsWorld;
+	private transient List<Chain> chains;
+	private transient List<Chain> prevChains;
+	double [][] autoCorrMap;
+	double [][] corrMap;
 			
 	private transient int  turnCnt = 0;
 	private long  totalTurns = 0;
 	private transient boolean isPaused = false;
 	private long seedCnt = 0;
 	private int fileCntTransformers = 0;
+	private int fileCntAutoCorrMapShot = 0;
+	private int fileCntCorrMapShot = 0;
 	
 	public World() {
 		init();
@@ -273,6 +283,9 @@ public class World implements Serializable{
 			seedAtoms();
 			resetActionCount();
 			curStatsWorld = null;
+			chains = null;
+			autoCorrMap = null;
+			corrMap = null;
 			for(turnCnt=0;turnCnt<turnsPerSeed;turnCnt++) {
 				//saveShotForTransformers();
 				nextTurn();
@@ -304,20 +317,44 @@ public class World implements Serializable{
 			if(trsf.getBonds().size() > 2) {
 				log.error("At seedCnt="+seedCnt+", detected too many bonds for trsf="+trsf.getFullInfoWithBonds(seedCnt));
 			}
-		}
-		
+		}		
 	}
 
 	/**
 	 * print list of chains with ChainStatsSummary
 	 */
 	private void saveChainsAnalytics() {
-		List<Chain> chains = extractChains(3);	// minimum 3 links in a chain
+		buildChains();
+		printChainList();	
+	    buildChainCorrelations();
+		curStatsWorld = buildWorldStatsRecord(chains);
+		saveShotForAutoCorrMap();
+		saveShotForCorrMap();
+		prevChains.clear();
+		prevChains.addAll(chains);
+        log.info(" === Saved chain analytics, seedCnt:"+seedCnt);
+	}
+
+	private void buildChains() {
+		if(chains == null) {
+			extractChains(4);	// minimum 4 links in a chain
+		}
+	}
+
+	private void buildChainCorrelations() {
+		if(autoCorrMap == null || corrMap == null) {
+			buildChainAutoCorrelation();
+			if(prevChains == null) {
+				prevChains  = new ArrayList<Chain>();
+				prevChains.addAll(chains);
+			}
+		}
+		buildChainCorrelation(prevChains,chains);
+	}
+
+	private String printChainList() {
 		String fileName = fileDir+"\\"+"chain_analytics_"+String.format("%07d",seedCnt)+".txt";
 		String line1 = buildWorldParamsTitle()+ "\n";
-		if(curStatsWorld == null) {
-			curStatsWorld = buildWorldStatsRecord(chains);
-		}		
 		String line2 = curStatsWorld+"\n";
 	    FileWriter fw=null;
 	    try {
@@ -330,19 +367,137 @@ public class World implements Serializable{
 	        out.close();
 	    } catch (IOException e) {
 	        e.printStackTrace();
+	    }
+		return fileName;
+	}
+
+	private void printChainCorrMapAscii() {
+		String fileName = fileDir+"\\"+"chains _correlation_"+String.format("%07d",seedCnt)+".txt";
+		String line1 = buildWorldParamsTitle()+ "\n";
+		String line2 = curStatsWorld+"\n";
+		String line3 = 	"    .........1.........2.........3.........4.........5.........6.........7.........8.........9.........0.........1.........2.........3.........4.........5.........6.........7.........8.........9.........0\n";
+	    FileWriter fw=null;
+	    try {
+	        fw = new FileWriter(fileName,false);
+	        BufferedWriter bw=new BufferedWriter(fw);
+	        PrintWriter out = new PrintWriter(bw);
+        	StringBuilder sb = new StringBuilder();
+        	sb.append(line1).append(line2).append(line3);
+	        for(int i=0;i<corrMap.length;i++) {
+	        	sb.append(String.format("%03d",i)).append("!");
+	        	for(int j=0;j<corrMap[i].length;j++) {
+	        		int val = ((int) (corrMap[i][j] * 10.0)) % 10;
+	        		sb.append(val);
+	        		//sb.append(String.format("%4.1f", corrMap[i][j]));
+	        	}
+	        	sb.append("\n");
+	        }
+	        sb.append(line3);
+	        out.write(sb.toString());
+	        out.close();
+	    } catch (IOException e) {
+	        e.printStackTrace();
 	    }	
-        log.info(" === Saved chain analytics, seedCnt:"+seedCnt+", file:"+fileName);
+	}
+
+	private void saveShotForCorrMap() {
+	    try {
+	        int maxCorrChains = corrMap.length;  
+	    	int width = 1000, titleHeight=40, height = width+ titleHeight;
+	        BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
+	        Graphics2D ig2 = bi.createGraphics();
+	        ig2.setColor(Color.BLACK);
+	        ig2.fillRect(0, 0, width, height);
+	        drawTitleForCorrMap(width, ig2);
+	        double delta = width /maxCorrChains;
+			int ox,oy,ow,oh;
+			float hue = 0f; //(float) (4.0/6.0);
+			for(int i=0;i<corrMap.length;i++) {
+				for(int j=0;j<corrMap[i].length;j++) {
+					ow=7;
+					oh=7;
+					Color color = Color.getHSBColor(hue, 0, (float) corrMap[i][j]);
+					ox = (int)(delta * i + (delta - ow)/2);
+					oy = titleHeight + (int)(delta * j + (delta - oh)/2);
+					ig2.setColor(color);
+					ig2.fillOval(ox, oy, ow, oh);
+				}
+			}
+			++fileCntCorrMapShot;
+	        String fileName = fileDir+"\\"+"corr_map_"+String.format("%05d",fileCntCorrMapShot);
+	        ImageIO.write(bi, "PNG", new File(fileName+".png"));
+	        //ImageIO.write(bi, "JPEG", new File("c:\\yourImageName.JPG"));	        
+	      	} catch (IOException ie) {
+	      		ie.printStackTrace();
+	      	}	
+    		log.info(" === Saving corrMap shot, seedCnt:{}, fileCntCorrMapShot:{}", seedCnt, fileCntCorrMapShot);
+	    }
+
+	private void saveShotForAutoCorrMap() {
+	    try {
+	        int maxCorrChains = autoCorrMap.length;  
+	    	int width = 1000, titleHeight=40, height = width+ titleHeight;
+	        BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
+	        Graphics2D ig2 = bi.createGraphics();
+	        ig2.setColor(Color.BLACK);
+	        ig2.fillRect(0, 0, width, height);
+	        drawTitleForCorrMap(width, ig2);
+	        double delta = width /maxCorrChains;
+			int ox,oy,ow,oh;
+			float hue = 0f; //(float) (4.0/6.0);
+			for(int i=0;i<autoCorrMap.length;i++) {
+				for(int j=0;j<autoCorrMap[i].length;j++) {
+					ow=7;
+					oh=7;
+					Color color = Color.getHSBColor(hue, 0, (float) autoCorrMap[i][j]);
+					ox = (int)(delta * i + (delta - ow)/2);
+					oy = titleHeight + (int)(delta * j + (delta - oh)/2);
+					ig2.setColor(color);
+					ig2.fillOval(ox, oy, ow, oh);
+				}
+			}
+			++fileCntAutoCorrMapShot;
+	        String fileName = fileDir+"\\"+"autocorr_map_"+String.format("%05d",fileCntAutoCorrMapShot);
+	        ImageIO.write(bi, "PNG", new File(fileName+".png"));
+	        //ImageIO.write(bi, "JPEG", new File("c:\\yourImageName.JPG"));	        
+	      	} catch (IOException ie) {
+	      		ie.printStackTrace();
+	      	}	
+    		log.info(" === Saving autoCorrMap shot, seedCnt:{}, fileCntAutoCorrMapShot:{}", seedCnt, fileCntAutoCorrMapShot);
+	    }
+
+	private double calculateAvgCorr(double[][] corrM) {
+		double sum = 0.;
+		int totLength = 0;
+		for(int i=0;i<corrM.length;i++) {
+			totLength += corrM[i].length;
+			for(int j=0;j<corrM[i].length;j++) {
+				sum += corrM[i][j];
+			}
+		}
+		return sum/totLength;
+	}
+
+	private void drawTitleForCorrMap(int width, Graphics2D ig2) {
+		int lineHeight = 20;
+		Font font = new Font("TimesRoman", Font.PLAIN, 14);
+		ig2.setFont(font);
+		String message = buildWorldParamsTitle();
+		FontMetrics fontMetrics = ig2.getFontMetrics();
+		int stringHeight = fontMetrics.getAscent();
+		ig2.setPaint(Color.WHITE);
+		ig2.drawString(message, 0, lineHeight / 2 + stringHeight / 4);
+		ig2.drawString(curStatsWorld.toString(), 0, (3 * lineHeight) / 2 + stringHeight / 4);
 	}
 
 	private void saveWorldAnalytics() {
-		List<Chain> chains = extractChains(3);	// minimum 3 links in a chain
-		String fileName = fileDir+"\\"+"world_analytics.txt";
-		if(curStatsWorld == null) {
-			curStatsWorld = buildWorldStatsRecord(chains);
-		}
+		buildChains();
+	    buildChainCorrelations();
+		curStatsWorld = buildWorldStatsRecord(chains);
 		worldStats.add(curStatsWorld);
 	    FileWriter fw=null;
 	    try {
+			String fileName = fileDir+"\\"+"world_analytics.txt";
 	        fw = new FileWriter(fileName,true);
 	        BufferedWriter bw=new BufferedWriter(fw);
 	        PrintWriter out = new PrintWriter(bw);
@@ -355,7 +510,33 @@ public class World implements Serializable{
 	    } catch (IOException e) {
 	        e.printStackTrace();
 	    }	
-        log.info(" === Saved world analytics, seedCnt:"+seedCnt+", stats size:"+worldStats.size());
+        log.info(" === Saved world analytics, seedCnt:"+seedCnt);
+	}
+
+	private void buildChainAutoCorrelation() {
+		autoCorrMap = new double [chains.size()][chains.size()];
+		for(int i=0;i<chains.size();i++) {
+			for(int j=0;j<chains.size();j++) {
+				if(i != j) {
+					Map<Integer, Double> corr = Correlator.correlate(chains.get(i), chains.get(j));
+					double max = corr.values().stream().mapToDouble(v -> v).max().orElse(0.);
+					autoCorrMap[i][j] = max;	
+				}else {
+					autoCorrMap[i][j] = 0.;
+				}
+			}
+		}
+	}
+	
+	private void buildChainCorrelation(List<Chain> chains1, List<Chain> chains2) {
+		corrMap = new double [chains1.size()][chains2.size()];
+		for(int i=0;i<chains1.size();i++) {
+			for(int j=0;j<chains2.size();j++) {
+				Map<Integer, Double> corr = Correlator.correlate(chains1.get(i), chains2.get(j));
+				double max = corr.values().stream().mapToDouble(v -> v).max().orElse(0.);
+				corrMap[i][j] = max;				
+			}
+		}
 	}
 
 	private WorldStatsSummary buildWorldStatsRecord(List<Chain> chains) {
@@ -395,11 +576,17 @@ public class World implements Serializable{
 		statsWorld.setAvgMatchPct(statsMatchPct.getAverage());
 		statsWorld.setMaxMatchPct(statsMatchPct.getMax());
 		statsWorld.setMinMatchPct(statsMatchPct.getMin());
+		statsWorld.setAvgAutoCorr(calculateAvgCorr(autoCorrMap));
+		statsWorld.setAvgPrevCorr(calculateAvgCorr(corrMap));
 		return statsWorld;
 	}
 
-	private List<Chain> extractChains(int minLength) {
-		ArrayList<Chain> chains = new ArrayList<Chain>();
+	private void extractChains(int minLength) {
+		if(this.chains != null
+			&& chains.size() > 0){
+				return;
+		}
+		ArrayList<Chain> tmpChains = new ArrayList<Chain>();
 		ArrayList<Transformer> tmpArr = (ArrayList<Transformer>) transformers.clone();
 		// Extract non-circular first
 		while(true) {
@@ -412,7 +599,7 @@ public class World implements Serializable{
 				if(trsf.getBonds().size() == 1) {
 					chain = buildChainFromTheEnd(trsf);
 					if(chain.size() >= minLength) {
-						chains.add(chain);
+						tmpChains.add(chain);
 					}
 					break;
 				}
@@ -434,7 +621,7 @@ public class World implements Serializable{
 				if(trsf.getBonds().size() == 2) {
 					chain = buildChainFromTheEnd(trsf);
 					if(chain.size() >= minLength) {
-						chains.add(chain);
+						tmpChains.add(chain);
 					}
 					break;
 				}
@@ -448,7 +635,7 @@ public class World implements Serializable{
 			//log.debug("=== tmpArr.size();:{}",tmpArr.size());
 		}
 		//log.debug("=== done");
-		return chains.stream().sorted(Comparator.comparing(Chain::size).reversed()).collect(Collectors.toList());
+		this.chains = tmpChains.stream().sorted(Comparator.comparing(Chain::size).reversed()).collect(Collectors.toList());
 	}
 
 	/**
@@ -506,9 +693,33 @@ public class World implements Serializable{
 				break;
 			}
 		}
-		return chain;
+		/* Since we can pick up either end of the chain randomly,
+		 * we have to ensure that every time we return the same sequence.
+		 * For that we compare list of transformers lexicographically and select the biggest one.
+		 */
+		Chain reversed = reverseChain(chain);
+		if(chain.getTrsfTypeList().compareTo(reversed.getTrsfTypeList()) > 0) {
+			return chain;
+		}else {
+			return reversed;
+		}
 	}
 	
+	private Chain reverseChain(Chain chain) {
+		Chain reversed = new Chain();
+		reversed.setCircular(chain.isCircular());
+		for(int i = chain.getAges().size()-1;i>=0;i--) {
+			reversed.getAges().add(chain.getAges().get(i));
+		}
+		for(int i = chain.getLinks().size()-1;i>=0;i--) {
+			reversed.getLinks().add(chain.getLinks().get(i));
+		}
+		for(int i = chain.getStrengths().size()-1;i>=0;i--) {
+			reversed.getStrengths().add(chain.getStrengths().get(i));
+		}
+		return reversed;
+	}
+
 	/**
 	 * Serialize current instance of the world.
 	 */
@@ -657,49 +868,7 @@ public class World implements Serializable{
 				log.trace("=== tryMoveTransformerTowardsTo, seedCnt:"+seedCnt+", standalone move failed, no luck for "+trsf.getShortInfo());
 			}
 			return false;
-		}
-		/* Will not implement snake-like pull
-		else if(neighbCnt == 1) {
-			// === end of the chain
-			if(rnd > chainMoveThr) {
-				// first, try to pull the chain
-				ArrayList<Transformer> links = trsf.getLinked(null);
-				log.debug("=== tryMoveTransformerTowardsTo, pulling end of chain:"+links);
-				for(Coordinates tmpCoord : vicinity) {
-					if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
-							&& !isCoordForbidden(trsf, tmpCoord, false)){
-						// No need to compare energy levels, because with simplified energy
-						// we do not consider possible attraction at tmpCoord from new neighbor
-						//
-						log.debug("=== tryMoveTransformerTowardsTo, endOfChain, whole chain pull allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
-						tearOffOrPullTransformer(trsf, tmpCoord);
-						//verifyTrsfPositions();
-						return true;
-					}
-				}
-				log.debug("=== tryMoveTransformerTowardsTo, endOfChain move failed, no place for "+trsf.getShortInfo());
-			}else if(rnd > trsfrMoveThr) {
-				// next try to tear off the single trsf
-				for(Coordinates tmpCoord : vicinity) {
-					if(Coordinates.calcDistance(tmpCoord, newCoord) < origDistance
-						&& !isCoordForbidden(trsf, tmpCoord, false)){
-						// Compare energy levels
-						double tmpLevel = getEnergyLevel(trsf,tmpCoord);
-						if(enoughEnergyForMove(tmpLevel - curLevel)) {
-							log.debug("=== tryMoveTransformerTowardsTo, endOfChain tear off allowed for "+trsf.getShortInfo()+" to "+tmpCoord);
-							relocateTransformerTo(trsf, tmpCoord);
-							//verifyTrsfPositions();
-							return true;
-						}
-					}
-				}
-				log.debug("=== tryMoveTransformerTowardsTo, endOfChain tear off failed, no place for "+trsf.getShortInfo());
-			}else {
-				log.debug("=== tryMoveTransformerTowardsTo, endOfChain move failed, no luck for "+trsf.getShortInfo());
-			}
-			return false;
-		}*/
-		else {
+		}else {
 			// === inside the chain
 			//chainMoveThr = 0.;
 			if(rnd > chainMoveThr) {
@@ -922,7 +1091,6 @@ public class World implements Serializable{
 		log.trace("=== isMoveWithLinksForbidden, move towards "+newCoord+" allowed for "+trsf.getShortInfo()+" with links");
 		return false;
 	}
-
 	
 	private boolean isWithinSpace(Coordinates testCoord) {
 		for( int coord : testCoord.getCoords()) {
@@ -1045,8 +1213,8 @@ public class World implements Serializable{
 	 * @return
 	 */
 	private boolean isCollisionWinning(Transformer activeTrsf, Transformer passiveTrsf) {
-		double bondStrengthActive = activeTrsf.getTotalBondStrength(seedCnt);
-		double bondStrengthPassive = passiveTrsf.getTotalBondStrength(seedCnt);
+		double bondStrengthActive = activeTrsf.getTotalBondStrength(seedCnt,2);
+		double bondStrengthPassive = passiveTrsf.getTotalBondStrength(seedCnt,2);
 		boolean winning = (bondStrengthActive - bondStrengthPassive) > collisionWinTrs;
 		log.debug("isCollisionWinning, , seedCnt:"+seedCnt+"activeTrsf:"+activeTrsf+", passiveTrsf:"+passiveTrsf+", bondStrengthActive="
 				+bondStrengthActive+", bondStrengthPassive:"+bondStrengthPassive
@@ -1122,7 +1290,7 @@ public class World implements Serializable{
 	private void saveShotForTransformers() {
 	    try {
 	    	// http://www.java2s.com/Code/Java/2D-Graphics-GUI/DrawanImageandsavetopng.htm
-	        int width = 1000, titleHeight=40, height = width+ titleHeight;
+	        int width = 1500, titleHeight=40, height = width+ titleHeight;
 	        BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
 	        Graphics2D ig2 = bi.createGraphics();
 	        ig2.setColor(Color.WHITE);
